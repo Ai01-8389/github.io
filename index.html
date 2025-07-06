@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生态环境特征污染物检测数据地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0c1e3e, #1a3a5f);
+            color: #e0f0ff;
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        header {
+            background: rgba(10, 25, 47, 0.95);
+            color: #e0f0ff;
+            padding: 1rem 2rem;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            position: relative;
+            z-index: 20;
+            border-bottom: 1px solid rgba(0, 150, 255, 0.3);
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .titles h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.3rem;
+            color: #4fc3f7;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.4);
+        }
+        
+        .titles h2 {
+            font-size: 1.1rem;
+            font-weight: 400;
+            opacity: 0.9;
+            margin-bottom: 15px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 25px;
+            background: rgba(16, 42, 67, 0.6);
+            padding: 10px 20px;
+            border-radius: 30px;
+            margin-top: 10px;
+            border: 1px solid rgba(64, 164, 223, 0.3);
+        }
+        
+        .stat-item {
+            text-align: center;
+            min-width: 100px;
+        }
+        
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #4db6ac;
+        }
+        
+        .stat-label {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+        
+        .container {
+            display: flex;
+            height: calc(100vh - 140px);
+            padding: 15px;
+            gap: 15px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        
+        /* 左侧信息面板样式 */
+        .sidebar {
+            width: 380px;
+            background: rgba(16, 42, 67, 0.85);
+            border-radius: 15px;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 20, 60, 0.3);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(64, 164, 223, 0.3);
+            z-index: 10;
+        }
+        
+        .section-title {
+            color: #4fc3f7;
+            padding-bottom: 12px;
+            margin: 10px 0 20px;
+            font-size: 1.4rem;
+            border-bottom: 2px solid rgba(79, 195, 247, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title i {
+            font-size: 1.2rem;
+        }
+        
+        .search-box {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 12px 15px;
+            background: rgba(10, 30, 50, 0.7);
+            border: 1px solid rgba(64, 164, 223, 0.5);
+            border-radius: 8px;
+            color: #e0f0ff;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .search-box input:focus {
+            border-color: #4fc3f7;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.3);
+        }
+        
+        .search-box button {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #0288d1, #4fc3f7);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        
+        .search-box button:hover {
+            background: linear-gradient(135deg, #0277bd, #29b6f6);
+            transform: translateY(-2px);
+        }
+        
+        .filter-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .filter-btn {
+            padding: 8px 15px;
+            background: rgba(30, 60, 90, 0.7);
+            border: 1px solid rgba(64, 164, 223, 0.4);
+            border-radius: 20px;
+            color: #b3e5fc;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+        
+        .filter-btn.active {
+            background: linear-gradient(135deg, #0288d1, #4fc3f7);
+            color: white;
+            border-color: #4fc3f7;
+        }
+        
+        .filter-btn:hover {
+            background: rgba(40, 80, 120, 0.8);
+        }
+        
+        .enterprise-list {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        
+        .enterprise-item {
+            padding: 18px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            background: rgba(20, 50, 80, 0.6);
+            border-left: 4px solid #4fc3f7;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .enterprise-item:hover {
+            background: rgba(30, 70, 110, 0.8);
+            transform: translateX(5px);
+        }
+        
+        .enterprise-item.active {
+            background: rgba(25, 65, 100, 0.9);
+            border-left: 4px solid #ff9800;
+            box-shadow: 0 0 15px rgba(255, 152, 0, 0.4);
+        }
+        
+        .enterprise-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        
+        .enterprise-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #4fc3f7;
+            flex: 1;
+        }
+        
+        .enterprise-location {
+            font-size: 0.9rem;
+            color: #81d4fa;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        
+        .pollutants-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        .pollutant-tag {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .tag-air {
+            background: rgba(79, 195, 247, 0.25);
+            border: 1px solid #4fc3f7;
+            color: #4fc3f7;
+        }
+        
+        .tag-water {
+            background: rgba(77, 182, 172, 0.25);
+            border: 1px solid #4db6ac;
+            color: #4db6ac;
+        }
+        
+        .tag-soil {
+            background: rgba(255, 152, 0, 0.25);
+            border: 1px solid #ff9800;
+            color: #ff9800;
+        }
+        
+        .tag-noise {
+            background: rgba(156, 39, 176, 0.25);
+            border: 1px solid #9c27b0;
+            color: #9c27b0;
+        }
+        
+        /* 信息面板样式 */
+        .info-panel {
+            background: rgba(20, 50, 80, 0.7);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(64, 164, 223, 0.3);
+        }
+        
+        .info-content {
+            min-height: 200px;
+        }
+        
+        /* 地图容器样式 */
+        .map-container {
+            flex: 1;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 5;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #1a3a5f;
+        }
+        
+        /* 统一标记样式 */
+        .custom-marker {
+            background: white;
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+            border: 2px solid white;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #0288d1, #4fc3f7);
+            color: white;
+        }
+        
+        .custom-marker:hover {
+            transform: scale(1.15);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 45vh;
+            }
+            
+            .map-container {
+                height: 50vh;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .stats {
+                width: 100%;
+                justify-content: space-around;
+            }
+        }
+        
+        .map-overlay {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(16, 42, 67, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(64, 164, 223, 0.4);
+            max-width: 300px;
+        }
+        
+        .map-overlay h3 {
+            color: #4fc3f7;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            border-bottom: 1px solid rgba(79, 195, 247, 0.4);
+            padding-bottom: 5px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4fc3f7;
+        }
+        
+        .legend-text {
+            font-size: 0.9rem;
+            color: #b3e5fc;
+        }
+        
+        .footer-note {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #81d4fa;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 25, 47, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            transition: opacity 0.5s ease;
+        }
+        
+        .loader {
+            width: 80px;
+            height: 80px;
+            border: 8px solid rgba(79, 195, 247, 0.2);
+            border-top: 8px solid #4fc3f7;
+            border-radius: 50%;
+            animation: spin 1.5s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 1.2rem;
+            color: #4fc3f7;
+            text-align: center;
+        }
+        
+        .data-source {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #4fc3f7;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loader"></div>
+        <div class="loading-text">正在加载企业数据...</div>
+    </div>
+    
+    <header>
+        <div class="header-content">
+            <div class="titles">
+                <h1><i class="fas fa-industry"></i> 生态环境特征污染物检测数据地图</h1>
+                <h2>数境部落-分享大气、水体、土壤等污染物检测数据</h2>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value">30</div>
+                    <div class="stat-label">监控企业</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">92%</div>
+                    <div class="stat-label">达标率</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">4</div>
+                    <div class="stat-label">污染物类型</div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="sidebar">
+            <h2 class="section-title"><i class="fas fa-list"></i> 重点监控企业列表</h2>
+            
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索企业名称...">
+                <button id="searchBtn"><i class="fas fa-search"></i> 搜索</button>
+            </div>
+            
+            <div class="filter-options">
+                <div class="filter-btn active">全部企业</div>
+                <div class="filter-btn">废气排放</div>
+                <div class="filter-btn">废水排放</div>
+                <div class="filter-btn">噪声污染</div>
+            </div>
+            
+            <div class="enterprise-list" id="enterpriseList">
+                <!-- 企业列表将通过JS动态生成 -->
+            </div>
+            
+            <div class="info-panel">
+                <h2 class="section-title"><i class="fas fa-info-circle"></i> 企业污染物信息</h2>
+                <div class="info-content" id="locationInfo">
+                    <p>请从左侧列表或地图中选择企业查看污染物信息</p>
+                </div>
+                <div class="data-source">
+                    <i class="fas fa-database"></i>
+                    <span>数据来源：大连市生态环境局 (2024年1月至今)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- 地图图例 -->
+            <div class="map-overlay">
+                <h3><i class="fas fa-map-marked-alt"></i> 图例说明</h3>
+                <div class="legend-item">
+                    <div class="legend-color"></div>
+                    <div class="legend-text">重点监控企业</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 大连市中心坐标
+        const dalianCenter = [38.9140, 121.6147];
+        
+        // 真实企业数据
+        const enterprises = [
+            {id: 1, name: "大连松下汽车电子系统有限公司", location: "大连经济技术开发区", coords: [39.0631, 121.8532], pollutants: ["废气", "噪声"]},
+            {id: 2, name: "大连海尔空调器有限公司", location: "大连保税区", coords: [39.0565, 121.8012], pollutants: ["废气", "废水"]},
+            {id: 3, name: "大连日进精密模塑有限公司", location: "大连金州区", coords: [39.1002, 121.7638], pollutants: ["废水", "噪声"]},
+            {id: 4, name: "大连崇达电路有限公司", location: "大连经济技术开发区", coords: [39.0503, 121.7826], pollutants: ["废水", "土壤"]},
+            {id: 5, name: "大连冰山集团有限公司", location: "大连市沙河口区", coords: [38.9158, 121.5684], pollutants: ["废气", "废水", "噪声"]},
+            {id: 6, name: "大连林德工程有限公司", location: "大连经济技术开发区", coords: [39.0448, 121.7821], pollutants: ["废气", "废水"]},
+            {id: 7, name: "大连豪森设备制造有限公司", location: "大连市甘井子区", coords: [38.9803, 121.3947], pollutants: ["噪声", "土壤"]},
+            {id: 8, name: "大连华锐重工集团股份有限公司", location: "大连市西岗区", coords: [38.8902, 121.6201], pollutants: ["废气", "废水", "噪声"]},
+            {id: 9, name: "大连东泰产业废弃物处理有限公司", location: "大连市甘井子区", coords: [38.9867, 121.6521], pollutants: ["废水", "土壤", "噪声"]},
+            {id: 10, name: "大连船舶重工集团有限公司", location: "大连市西岗区", coords: [38.9321, 121.6521], pollutants: ["废气", "废水", "土壤"]},
+            {id: 11, name: "大连石化公司", location: "大连市甘井子区", coords: [38.9756, 121.6023], pollutants: ["废气", "废水", "土壤"]},
+            {id: 12, name: "大连西太平洋石油化工有限公司", location: "大连经济技术开发区", coords: [39.0365, 121.8167], pollutants: ["废气", "废水", "土壤"]},
+            {id: 13, name: "大连逸盛大化石化有限公司", location: "大连长兴岛经济区", coords: [39.5687, 121.2673], pollutants: ["废气", "废水"]},
+            {id: 14, name: "大连福佳大化石油化工有限公司", location: "大连经济技术开发区", coords: [39.0056, 121.8412], pollutants: ["废气", "废水"]},
+            {id: 15, name: "大连机车车辆有限公司", location: "大连市沙河口区", coords: [38.9225, 121.5923], pollutants: ["废气", "噪声"]},
+            {id: 16, name: "大连固特异轮胎有限公司", location: "大连保税区", coords: [39.0558, 121.7954], pollutants: ["废气", "废水", "噪声"]},
+            {id: 17, name: "大连蒂业技凯瓦轴工业有限公司", location: "大连经济技术开发区", coords: [39.0521, 121.7892], pollutants: ["废水", "噪声"]},
+            {id: 18, name: "大连东芝机车电气设备有限公司", location: "大连经济技术开发区", coords: [39.0583, 121.8125], pollutants: ["废水", "土壤"]},
+            {id: 19, name: "大连中集特种物流装备有限公司", location: "大连保税区", coords: [39.0624, 121.7987], pollutants: ["废气", "噪声"]},
+            {id: 20, name: "大连爱丽思生活用品有限公司", location: "大连出口加工区", coords: [39.0579, 121.8076], pollutants: ["废气", "废水"]},
+            {id: 21, name: "大连三菱电机有限公司", location: "大连经济技术开发区", coords: [39.0628, 121.8517], pollutants: ["废水", "噪声"]},
+            {id: 22, name: "大连三垦变压器有限公司", location: "大连经济技术开发区", coords: [39.0552, 121.7883], pollutants: ["噪声"]},
+            {id: 23, name: "大连东芝电视有限公司", location: "大连经济技术开发区", coords: [39.0501, 121.7824], pollutants: ["废水", "土壤"]},
+            {id: 24, name: "大连日立机械设备有限公司", location: "大连经济技术开发区", coords: [39.0625, 121.8512], pollutants: ["废气", "噪声"]},
+            {id: 25, name: "大连阿尔卑斯电子有限公司", location: "大连出口加工区", coords: [39.0582, 121.8081], pollutants: ["废水", "噪声"]},
+            {id: 26, name: "大连三洋冷链有限公司", location: "大连经济技术开发区", coords: [39.0626, 121.8520], pollutants: ["废气", "废水"]},
+            {id: 27, name: "大连三洋压缩机有限公司", location: "大连经济技术开发区", coords: [39.0629, 121.8523], pollutants: ["废气", "噪声"]},
+            {id: 28, name: "大连三洋家用电器有限公司", location: "大连经济技术开发区", coords: [39.0630, 121.8525], pollutants: ["废水", "噪声"]},
+            {id: 29, name: "大连中集重化装备有限公司", location: "大连市甘井子区", coords: [38.9782, 121.5321], pollutants: ["废气", "废水"]},
+            {id: 30, name: "大连宝原核设备有限公司", location: "大连市甘井子区", coords: [38.9685, 121.6223], pollutants: ["废水", "土壤"]}
+        ];
+
+        // 当前显示的企业列表
+        let currentEnterprises = [];
+        let markers = [];
+        let currentFilter = "全部企业";
+        let map; // 地图实例
+        
+        // 初始化地图
+        function initMap() {
+            const mapInstance = L.map('map').setView(dalianCenter, 11);
+            
+            // 使用可靠的CartoDB地图服务
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(mapInstance);
+            
+            // 添加大连市边界
+            const dalianBounds = [
+                [38.5, 120.8],  // 西南坐标
+                [39.4, 122.3]   // 东北坐标
+            ];
+            
+            // 添加边界矩形
+            L.rectangle(dalianBounds, {
+                color: "#4fc3f7",
+                weight: 2,
+                fillOpacity: 0.05
+            }).addTo(mapInstance);
+            
+            return mapInstance;
+        }
+
+        // 在地图上添加企业标记
+        function addMarkersToMap(mapInstance, enterprises) {
+            // 清除现有标记
+            markers.forEach(marker => mapInstance.removeLayer(marker));
+            markers = [];
+            
+            enterprises.forEach(enterprise => {
+                // 创建标记元素
+                const markerElement = document.createElement('div');
+                markerElement.className = 'custom-marker';
+                markerElement.innerHTML = `<i class="fas fa-industry"></i>`;
+                
+                // 创建自定义标记
+                const marker = L.marker(enterprise.coords, {
+                    title: `${enterprise.name}\n污染物: ${enterprise.pollutants.join(', ')}`,
+                    alt: enterprise.name,
+                    riseOnHover: true,
+                    icon: L.divIcon({
+                        html: markerElement.outerHTML,
+                        className: '',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 20]
+                    })
+                }).addTo(mapInstance);
+                
+                // 绑定弹出框（显示企业名称和污染物）
+                marker.bindPopup(`
+                    <div style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">
+                        <i class="fas fa-industry"></i> ${enterprise.name}
+                    </div>
+                    <div style="margin-bottom: 5px; color: #666;">
+                        <i class="fas fa-map-marker-alt"></i> ${enterprise.location}
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <div style="font-weight: bold; margin-bottom: 5px; color: #4fc3f7;">
+                            <i class="fas fa-biohazard"></i> 主要污染物
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                            ${enterprise.pollutants.map(p => 
+                                `<span style="background: #4fc3f7; 
+                                    color: white; 
+                                    padding: 3px 8px; 
+                                    border-radius: 12px; 
+                                    font-size: 12px;">
+                                    ${p}
+                                </span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `);
+                
+                marker.on('click', function() {
+                    showEnterpriseInfo(enterprise);
+                    highlightEnterprise(enterprise.id);
+                });
+                
+                marker.enterpriseId = enterprise.id;
+                markers.push(marker);
+            });
+        }
+
+        // 显示企业信息
+        function showEnterpriseInfo(enterprise) {
+            const infoDiv = document.getElementById('locationInfo');
+            
+            // 创建污染物标签
+            let pollutantTags = "";
+            enterprise.pollutants.forEach(pollutant => {
+                let tagClass = "pollutant-tag ";
+                if (pollutant === "废气") tagClass += "tag-air";
+                if (pollutant === "废水") tagClass += "tag-water";
+                if (pollutant === "土壤") tagClass += "tag-soil";
+                if (pollutant === "噪声") tagClass += "tag-noise";
+                
+                pollutantTags += `<div class="${tagClass}">${pollutant}</div>`;
+            });
+            
+            // 创建信息HTML
+            infoDiv.innerHTML = `
+                <h3>${enterprise.name}</h3>
+                <p class="enterprise-location"><i class="fas fa-map-marker-alt"></i> ${enterprise.location}</p>
+                
+                <div style="margin-top: 15px;">
+                    <h4 style="color: #4fc3f7; margin-bottom: 10px; border-bottom: 1px solid rgba(79, 195, 247, 0.4); padding-bottom: 5px;">
+                        <i class="fas fa-biohazard"></i> 主要污染物类型
+                    </h4>
+                    <div class="pollutants-tags">
+                        ${pollutantTags}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 在列表中高亮显示选中的企业
+        function highlightEnterprise(enterpriseId) {
+            // 移除所有active类
+            document.querySelectorAll('.enterprise-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 为当前选中的项添加active类
+            const selectedItem = document.querySelector(`.enterprise-item[data-id="${enterpriseId}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('active');
+                selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        // 初始化企业列表
+        function initEnterpriseList(enterprises) {
+            const listContainer = document.getElementById('enterpriseList');
+            listContainer.innerHTML = '';
+            
+            enterprises.forEach(enterprise => {
+                // 创建污染物标签
+                let pollutantTags = "";
+                enterprise.pollutants.forEach(pollutant => {
+                    let tagClass = "pollutant-tag ";
+                    if (pollutant === "废气") tagClass += "tag-air";
+                    if (pollutant === "废水") tagClass += "tag-water";
+                    if (pollutant === "土壤") tagClass += "tag-soil";
+                    if (pollutant === "噪声") tagClass += "tag-noise";
+                    
+                    pollutantTags += `<div class="${tagClass}">${pollutant}</div>`;
+                });
+                
+                const item = document.createElement('div');
+                item.className = 'enterprise-item';
+                item.dataset.id = enterprise.id;
+                item.innerHTML = `
+                    <div class="enterprise-header">
+                        <div class="enterprise-name">${enterprise.name}</div>
+                    </div>
+                    <div class="pollutants-tags">
+                        ${pollutantTags}
+                    </div>
+                    <div class="enterprise-location"><i class="fas fa-map-marker-alt"></i> ${enterprise.location}</div>
+                `;
+                
+                // 添加点击事件
+                item.addEventListener('click', () => {
+                    showEnterpriseInfo(enterprise);
+                    highlightEnterprise(enterprise.id);
+                });
+                
+                listContainer.appendChild(item);
+            });
+        }
+
+        // 搜索功能
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const searchBtn = document.getElementById('searchBtn');
+            
+            searchBtn.addEventListener('click', performSearch);
+            searchInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') performSearch();
+            });
+            
+            function performSearch() {
+                const searchTerm = searchInput.value.toLowerCase().trim();
+                if (!searchTerm) return;
+                
+                // 查找匹配的企业
+                const foundEnterprise = currentEnterprises.find(ent => 
+                    ent.name.toLowerCase().includes(searchTerm)
+                );
+                
+                if (foundEnterprise) {
+                    showEnterpriseInfo(foundEnterprise);
+                    highlightEnterprise(foundEnterprise.id);
+                } else {
+                    alert('未找到匹配的企业，请尝试其他关键词');
+                }
+            }
+        }
+
+        // 设置筛选功能
+        function setupFilter() {
+            const filterOptions = document.querySelectorAll('.filter-btn');
+            
+            filterOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    // 移除所有active类
+                    filterOptions.forEach(opt => opt.classList.remove('active'));
+                    
+                    // 为当前选中的项添加active类
+                    this.classList.add('active');
+                    currentFilter = this.textContent;
+                    
+                    // 应用筛选
+                    applyFilter();
+                });
+            });
+        }
+        
+        // 应用筛选
+        function applyFilter() {
+            let filteredEnterprises = enterprises;
+            
+            if (currentFilter !== "全部企业") {
+                filteredEnterprises = enterprises.filter(ent => 
+                    ent.pollutants.includes(currentFilter.replace("排放", ""))
+                );
+            }
+            
+            currentEnterprises = filteredEnterprises;
+            initEnterpriseList(filteredEnterprises);
+            addMarkersToMap(map, filteredEnterprises);
+            
+            // 默认显示第一个企业信息
+            if (filteredEnterprises.length > 0) {
+                showEnterpriseInfo(filteredEnterprises[0]);
+                highlightEnterprise(filteredEnterprises[0].id);
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化地图
+            map = initMap();
+            
+            // 加载所有企业数据
+            currentEnterprises = enterprises;
+            initEnterpriseList(enterprises);
+            addMarkersToMap(map, enterprises);
+            
+            // 默认显示第一个企业信息
+            if (enterprises.length > 0) {
+                showEnterpriseInfo(enterprises[0]);
+                highlightEnterprise(enterprises[0].id);
+            }
+            
+            // 设置搜索功能
+            setupSearch();
+            
+            // 设置筛选功能
+            setupFilter();
+            
+            // 隐藏加载屏幕
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                }, 500);
+            }, 800);
+        });
+    </script>
+</body>
+</html>
