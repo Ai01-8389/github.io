@@ -3,2419 +3,537 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>生态环境特征污染物检测数据地图</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <title>生态环境检测数据开发 - 数境部落</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Leaflet 地图样式 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- 引入 Font Awesome 图标 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
-        * {
-            margin: 0;
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        #map { height: 100vh; width: 100%; z-index: 0; }
+        .sidebar { z-index: 1000; }
+        
+        /* 自定义 Popup 样式 */
+        .custom-popup .leaflet-popup-content-wrapper {
+            border-radius: 8px;
             padding: 0;
-            box-sizing: border-box;
-            font-family: 'Microsoft YaHei', sans-serif;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
         }
+        .custom-popup .leaflet-popup-content { margin: 0; width: 280px !important; }
         
-        body {
-            background: linear-gradient(135deg, #0c1e3e, #1a3a5f);
-            color: #e0f0ff;
-            line-height: 1.6;
-            height: 100vh;
-            overflow: hidden;
-        }
+        /* 污染物标签颜色 */
+        .pollutant-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-right: 4px; margin-bottom: 4px; }
+        .tag-大气 { background-color: #fee2e2; color: #991b1b; }
+        .tag-水体 { background-color: #dbeafe; color: #1e40af; }
+        .tag-土壤 { background-color: #fef3c7; color: #92400e; }
+        .tag-噪声 { background-color: #f3f4f6; color: #374151; }
         
-        header {
-            background: rgba(10, 25, 47, 0.95);
-            color: #e0f0ff;
-            padding: 1rem 2rem;
-            text-align: center;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            position: relative;
-            z-index: 20;
-            border-bottom: 1px solid rgba(0, 150, 255, 0.3);
+        /* 微信二维码悬浮样式 - 向下显示 */
+        .wechat-container { position: relative; }
+        .wechat-qrcode { 
+            display: none; 
+            position: absolute; 
+            top: 100%; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            margin-top: 12px; 
+            padding: 12px; 
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); 
+            text-align: center; 
+            z-index: 2000;
+            border: 1px solid #f3f4f6;
+            width: 180px;
         }
+        .wechat-container:hover .wechat-qrcode { display: block; animation: fadeIn 0.2s ease-out; }
+        .wechat-qrcode img { width: 150px; height: 150px; object-fit: contain; }
         
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
-        
-        .titles h1 {
-            font-size: 1.8rem;
-            margin-bottom: 0.3rem;
-            color: #4fc3f7;
-            text-shadow: 0 0 10px rgba(79, 195, 247, 0.4);
-        }
-        
-        .titles h2 {
-            font-size: 1.1rem;
-            font-weight: 400;
-            opacity: 0.9;
-            margin-bottom: 15px;
-        }
-        
-        .stats {
-            display: flex;
-            gap: 25px;
-            background: rgba(16, 42, 67, 0.6);
-            padding: 10px 20px;
-            border-radius: 30px;
-            margin-top: 10px;
-            border: 1px solid rgba(64, 164, 223, 0.3);
-        }
-        
-        .stat-item {
-            text-align: center;
-            min-width: 100px;
-        }
-        
-        .stat-value {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #4db6ac;
-        }
-        
-        .stat-label {
-            font-size: 0.85rem;
-            opacity: 0.8;
-        }
-        
-        .container {
-            display: flex;
-            height: calc(100vh - 140px);
-            padding: 15px;
-            gap: 15px;
-            max-width: 1800px;
-            margin: 0 auto;
-        }
-        
-        /* 左侧信息面板样式 */
-        .sidebar {
-            width: 380px;
-            background: rgba(16, 42, 67, 0.85);
-            border-radius: 15px;
-            padding: 20px;
-            overflow-y: auto;
-            box-shadow: 0 8px 32px rgba(0, 20, 60, 0.3);
-            display: flex;
-            flex-direction: column;
-            border: 1px solid rgba(64, 164, 223, 0.3);
-            z-index: 10;
-        }
-        
-        .section-title {
-            color: #4fc3f7;
-            padding-bottom: 12px;
-            margin: 10px 0 20px;
-            font-size: 1.4rem;
-            border-bottom: 2px solid rgba(79, 195, 247, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .section-title i {
-            font-size: 1.2rem;
-        }
-        
-        .search-box {
-            display: flex;
-            margin-bottom: 20px;
-            gap: 10px;
-        }
-        
-        .search-box input {
-            flex: 1;
-            padding: 12px 15px;
-            background: rgba(10, 30, 50, 0.7);
-            border: 1px solid rgba(64, 164, 223, 0.5);
-            border-radius: 8px;
-            color: #e0f0ff;
-            font-size: 16px;
-            transition: all 0.3s;
-        }
-        
-        .search-box input:focus {
-            border-color: #4fc3f7;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.3);
-        }
-        
-        .search-box button {
-            padding: 12px 20px;
-            background: linear-gradient(135deg, #0288d1, #4fc3f7);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: bold;
-        }
-        
-        .search-box button:hover {
-            background: linear-gradient(135deg, #0277bd, #29b6f6);
-            transform: translateY(-2px);
-        }
-        
-        .filter-options {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .filter-btn {
-            padding: 8px 15px;
-            background: rgba(30, 60, 90, 0.7);
-            border: 1px solid rgba(64, 164, 223, 0.4);
-            border-radius: 20px;
-            color: #b3e5fc;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 0.9rem;
-        }
-        
-        .filter-btn.active {
-            background: linear-gradient(135deg, #0288d1, #4fc3f7);
-            color: white;
-            border-color: #4fc3f7;
-        }
-        
-        .filter-btn:hover {
-            background: rgba(40, 80, 120, 0.8);
-        }
-        
-        .enterprise-list {
-            flex: 1;
-            overflow-y: auto;
-            margin-bottom: 15px;
-        }
-        
-        .enterprise-item {
-            padding: 18px;
-            margin-bottom: 15px;
-            border-radius: 10px;
-            background: rgba(20, 50, 80, 0.6);
-            border-left: 4px solid #4fc3f7;
-            transition: all 0.3s;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-        
-        .enterprise-item:hover {
-            background: rgba(30, 70, 110, 0.8);
-            transform: translateX(5px);
-        }
-        
-        .enterprise-item.active {
-            background: rgba(25, 65, 100, 0.9);
-            border-left: 4px solid #ff9800;
-            box-shadow: 0 0 15px rgba(255, 152, 0, 0.4);
-        }
-        
-        .enterprise-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
-        }
-        
-        .enterprise-name {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #4fc3f7;
-            flex: 1;
-        }
-        
-        .enterprise-location {
-            font-size: 0.9rem;
-            color: #81d4fa;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            margin-top: 5px;
-        }
-        
-        .pollutants-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 15px;
-        }
-        
-        .pollutant-tag {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-        
-        .tag-air {
-            background: rgba(79, 195, 247, 0.25);
-            border: 1px solid #4fc3f7;
-            color: #4fc3f7;
-        }
-        
-        .tag-water {
-            background: rgba(77, 182, 172, 0.25);
-            border: 1px solid #4db6ac;
-            color: #4db6ac;
-        }
-        
-        .tag-soil {
-            background: rgba(255, 152, 0, 0.25);
-            border: 1px solid #ff9800;
-            color: #ff9800;
-        }
-        
-        .tag-noise {
-            background: rgba(156, 39, 176, 0.25);
-            border: 1px solid #9c27b0;
-            color: #9c27b0;
-        }
-        
-        /* 信息面板样式 */
-        .info-panel {
-            background: rgba(20, 50, 80, 0.7);
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(64, 164, 223, 0.3);
-        }
-        
-        .info-content {
-            min-height: 200px;
-        }
-        
-        /* 地图容器样式 */
-        .map-container {
-            flex: 1;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            position: relative;
-            z-index: 5;
-        }
-        
-        #map {
-            width: 100%;
-            height: 100%;
-            background: #1a3a5f;
-        }
-        
-        /* 统一标记样式 */
-        .custom-marker {
-            background: white;
-            border-radius: 50%;
-            width: 38px;
-            height: 38px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
-            border: 2px solid white;
-            font-weight: bold;
-            font-size: 16px;
-            transition: all 0.3s;
-            background: linear-gradient(135deg, #0288d1, #4fc3f7);
-            color: white;
-        }
-        
-        .custom-marker:hover {
-            transform: scale(1.15);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
-        }
-        
-        /* 响应式设计 */
-        @media (max-width: 900px) {
-            .container {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                max-height: 45vh;
-            }
-            
-            .map-container {
-                height: 50vh;
-            }
-            
-            .header-content {
-                flex-direction: column;
-                gap: 15px;
-            }
-            
-            .stats {
-                width: 100%;
-                justify-content: space-around;
-            }
-        }
-        
-        .map-overlay {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(16, 42, 67, 0.95);
-            padding: 15px;
-            border-radius: 10px;
-            z-index: 1000;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(64, 164, 223, 0.4);
-            max-width: 300px;
-        }
-        
-        .map-overlay h3 {
-            color: #4fc3f7;
-            margin-bottom: 10px;
-            font-size: 1.2rem;
-            border-bottom: 1px solid rgba(79, 195, 247, 0.4);
-            padding-bottom: 5px;
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-        
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #4fc3f7;
-        }
-        
-        .legend-text {
-            font-size: 0.9rem;
-            color: #b3e5fc;
-        }
-        
-        .footer-note {
-            text-align: center;
-            font-size: 0.85rem;
-            color: #81d4fa;
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid rgba(255, 255, 255, 0.15);
-        }
-        
-        .loading-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(10, 25, 47, 0.95);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            transition: opacity 0.5s ease;
-        }
-        
-        .loader {
-            width: 80px;
-            height: 80px;
-            border: 8px solid rgba(79, 195, 247, 0.2);
-            border-top: 8px solid #4fc3f7;
-            border-radius: 50%;
-            animation: spin 1.5s linear infinite;
-            margin-bottom: 20px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .loading-text {
-            font-size: 1.2rem;
-            color: #4fc3f7;
-            text-align: center;
-        }
-        
-        .data-source {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 10px;
-            font-size: 0.9rem;
-            color: #4fc3f7;
-        }
-        
-        .pagination {
-            display: flex;
-            justify-content: center;
-            margin-top: 15px;
-            gap: 10px;
-        }
-        
-        .pagination-btn {
-            padding: 6px 12px;
-            background: rgba(30, 60, 90, 0.7);
-            border: 1px solid rgba(64, 164, 223, 0.4);
-            border-radius: 5px;
-            color: #b3e5fc;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .pagination-btn:hover {
-            background: rgba(40, 80, 120, 0.8);
-        }
-        
-        .pagination-btn.active {
-            background: linear-gradient(135deg, #0288d1, #4fc3f7);
-            color: white;
-            border-color: #4fc3f7;
-        }
-        
-        .pagination-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+
+        /* 滚动条美化 */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
     </style>
 </head>
-<body>
-    <div class="loading-screen" id="loadingScreen">
-        <div class="loader"></div>
-        <div class="loading-text">正在加载企业数据...</div>
-    </div>
-    
-    <header>
-        <div class="header-content">
-            <div class="titles">
-                <h1><i class="fas fa-industry"></i> 生态环境特征污染物检测数据地图</h1>
-                <h2>数境部落-分享大气、水体、土壤等污染物检测数据</h2>
+<body class="bg-gray-50 overflow-hidden">
+
+    <!-- 顶部导航栏 -->
+    <nav class="absolute top-0 left-0 w-full bg-white/90 backdrop-blur-md shadow-sm z-[1000] h-16 flex items-center justify-between px-6 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">
+                <i class="fa-solid fa-layer-group"></i>
             </div>
-            <div class="stats">
-                <div class="stat-item">
-                    <div class="stat-value">214</div>
-                    <div class="stat-label">监控企业</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">92%</div>
-                    <div class="stat-label">达标率</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">4</div>
-                    <div class="stat-label">污染物类型</div>
-                </div>
-            </div>
-        </div>
-    </header>
-    
-    <div class="container">
-        <div class="sidebar">
-            <h2 class="section-title"><i class="fas fa-list"></i> 重点监控企业列表</h2>
-            
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="搜索企业名称...">
-                <button id="searchBtn"><i class="fas fa-search"></i> 搜索</button>
-            </div>
-            
-            <div class="filter-options">
-                <div class="filter-btn active">全部企业</div>
-                <div class="filter-btn">废气排放</div>
-                <div class="filter-btn">废水排放</div>
-                <div class="filter-btn">土壤污染</div>
-                <div class="filter-btn">噪声污染</div>
-            </div>
-            
-            <div class="enterprise-list" id="enterpriseList">
-                <!-- 企业列表将通过JS动态生成 -->
-            </div>
-            
-            <div class="pagination" id="pagination">
-                <!-- 分页按钮将通过JS动态生成 -->
-            </div>
-            
-            <div class="info-panel">
-                <h2 class="section-title"><i class="fas fa-info-circle"></i> 企业污染物信息</h2>
-                <div class="info-content" id="locationInfo">
-                    <p>请从左侧列表或地图中选择企业查看污染物信息</p>
-                </div>
-                <div class="data-source">
-                    <i class="fas fa-database"></i>
-                    <span>数据来源：大连市生态环境局 (2024年1月至今)</span>
-                </div>
+            <div>
+                <h1 class="text-lg font-bold text-gray-800 tracking-tight">生态环境检测数据开发</h1>
+                <p class="text-xs text-gray-500 font-medium">数境部落 | Data Environment Tribe</p>
             </div>
         </div>
         
-        <div class="map-container">
-            <div id="map"></div>
+        <div class="flex items-center gap-3">
+            <!-- 入口 1: 突发环境应急助手 -->
+            <a href="http://dify.nissin.com.cn:8091/chat/He5uHiZHkXeu44bE" target="_blank" class="hidden md:flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 hover:shadow-md transition-all font-medium text-sm border border-red-100">
+                <i class="fa-solid fa-triangle-exclamation"></i> 应急助手
+            </a>
             
-            <!-- 地图图例 -->
-            <div class="map-overlay">
-                <h3><i class="fas fa-map-marked-alt"></i> 图例说明</h3>
-                <div class="legend-item">
-                    <div class="legend-color"></div>
-                    <div class="legend-text">重点监控企业</div>
+            <!-- 入口 2: 环境检测信息管理系统 -->
+            <a href="https://www.jiandaoyun.com/AI01Data" target="_blank" class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 hover:shadow-md transition-all font-medium text-sm border border-blue-100">
+                <i class="fa-solid fa-database"></i> 管理系统
+            </a>
+
+            <!-- 微信服务号入口 -->
+            <div class="wechat-container ml-2">
+                <button class="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 hover:shadow-md transition-all font-medium text-sm border border-green-100 group">
+                    <i class="fa-brands fa-weixin"></i> 爱一数据
+                </button>
+                
+                <!-- 二维码弹窗 (向下显示) -->
+                <div class="wechat-qrcode">
+                    <!-- 请确保此图片链接有效，或者替换为您本地的图片路径 -->
+                    <img src="https://ai01-8389.github.io/github.io/wechat_qr.jpg" alt="爱一数据二维码" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiB2aWV3Qm94PSIwIDAgMTUwIDE1MCI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzlkOTlhMSI+请替换为真实图片链接</text></svg>'">
+                    <p class="text-xs text-gray-500 mt-2 font-semibold">微信搜索“爱一数据”</p>
+                    <div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-gray-400">
+                        <i class="fa-solid fa-qrcode"></i> 扫码关注
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 移动端底部操作栏 -->
+    <div class="md:hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[1000] flex gap-4 bg-white/90 backdrop-blur px-4 py-3 rounded-full shadow-xl border border-gray-100">
+        <a href="http://dify.nissin.com.cn:8091/chat/He5uHiZHkXeu44bE" target="_blank" class="flex flex-col items-center gap-1">
+            <div class="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-red-500/30">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <span class="text-[10px] font-medium text-gray-600">应急</span>
+        </a>
+        <a href="https://www.jiandaoyun.com/AI01Data" target="_blank" class="flex flex-col items-center gap-1">
+            <div class="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <i class="fa-solid fa-database"></i>
+            </div>
+            <span class="text-[10px] font-medium text-gray-600">系统</span>
+        </a>
+        <!-- 移动端微信入口 -->
+        <div class="relative wechat-container-mobile" id="mobile-wechat-btn">
+            <div class="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-green-500/30 cursor-pointer">
+                <i class="fa-brands fa-weixin"></i>
+            </div>
+            <span class="text-[10px] font-medium text-gray-600 absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap">公众号</span>
+            
+            <!-- 移动端弹窗 -->
+            <div id="mobile-qrcode-popup" class="fixed inset-0 bg-black/50 z-[2000] hidden flex items-end justify-center pb-20">
+                <div class="bg-white rounded-t-2xl p-6 w-full max-w-sm animate-slide-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800">关注公众号</h3>
+                        <button onclick="document.getElementById('mobile-qrcode-popup').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <img src="https://ai01-8389.github.io/github.io/wechat_qr.jpg" alt="爱一数据二维码" class="w-48 h-48 object-contain mb-4 border rounded-lg p-2" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSIwIDAgMjAwIDIwMCI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzlkOTlhMSI+请替换为真实图片链接</text></svg>'">
+                        <p class="text-sm font-semibold text-gray-700">爱一数据</p>
+                        <p class="text-xs text-gray-500 mt-1">长按识别二维码或搜索关注</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- 左侧统计与搜索面板 -->
+    <div class="absolute top-20 left-6 w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-100 p-5 sidebar max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
+        <div class="mb-5">
+            <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">数据概览</h2>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-gradient-to-br from-blue-50 to-white p-3 rounded-xl border border-blue-100 text-center shadow-sm">
+                    <div class="text-2xl font-bold text-blue-600" id="total-count">0</div>
+                    <div class="text-xs text-gray-500 mt-1">监控企业</div>
+                </div>
+                <div class="bg-gradient-to-br from-green-50 to-white p-3 rounded-xl border border-green-100 text-center shadow-sm">
+                    <div class="text-2xl font-bold text-green-600">100%</div>
+                    <div class="text-xs text-gray-500 mt-1">数据覆盖率</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="relative mb-4">
+            <input type="text" id="search-input" placeholder="搜索企业名称..." class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm">
+            <i class="fa-solid fa-search absolute left-3.5 top-3 text-gray-400 text-sm"></i>
+        </div>
+
+        <div class="space-y-1" id="company-list">
+            <div class="text-center text-gray-400 text-sm py-8">
+                <i class="fa-solid fa-circle-notch fa-spin mb-2"></i><br>正在加载 214 条企业数据...
+            </div>
+        </div>
+    </div>
+
+    <!-- 地图容器 -->
+    <div id="map"></div>
+
+    <!-- 引入 Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // 辽宁省中心坐标
-        const liaoningCenter = [41.2924, 122.7610];
-        
-        // 214个企业数据
-        const enterprises = [
-            {
-                id: 1,
-                name: "大连中远海运能源供应链有限公司",
-                location: "大连市",
-                coords: [39.47994472222222, 121.32389861111111],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 2,
-                name: "大连威嘉船舶配件有限公司",
-                location: "大连市",
-                coords: [39.08314305555556, 121.67866166666667],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 3,
-                name: "中石化催化剂大连有限公司",
-                location: "大连市",
-                coords: [38.93752222222222, 121.27018611111111],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 4,
-                name: "大连沙河口胃康医院有限公司",
-                location: "大连市",
-                coords: [38.94298222222222, 121.55771805555556],
-                pollutants: ["废水", "噪声"]
-            },
-            {
-                id: 5,
-                name: "大连固特异轮胎有限公司",
-                location: "大连市",
-                coords: [39.42469055555555, 121.91553027777778],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 6,
-                name: "大连锦宇金属制品有限公司",
-                location: "大连市",
-                coords: [39.18964444444444, 121.80869444444444],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 7,
-                name: "大连铎泽再生物资回收有限公司",
-                location: "大连市",
-                coords: [38.85832555555556, 121.23609888888889],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 8,
-                name: "大连亚明汽车部件股份有限公司",
-                location: "大连市",
-                coords: [38.81927388888889, 121.17231222222222],
-                pollutants: ["废气"]
-            },
-            {
-                id: 9,
-                name: "大连泷田金属制品有限公司",
-                location: "大连市",
-                coords: [39.09386666666667, 121.92016194444445],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 10,
-                name: "大连金普新区晓慧服装辅料加工厂",
-                location: "大连市",
-                coords: [39.11213111111111, 121.72817222222222],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 11,
-                name: "大连天童金属表面处理有限公司",
-                location: "大连市",
-                coords: [38.98219527777778, 121.39785111111111],
-                pollutants: ["废气"]
-            },
-            {
-                id: 12,
-                name: "大连天兴盛康源饲料有限公司",
-                location: "大连市",
-                coords: [39.72071444444444, 122.95813222222223],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 13,
-                name: "大连达伦特香氛科技有限公司",
-                location: "大连市",
-                coords: [39.34665833333333, 121.98246000000001],
-                pollutants: ["废水"]
-            },
-            {
-                id: 14,
-                name: "大连国华供热有限公司",
-                location: "大连市",
-                coords: [38.97166111111111, 121.53123055555555],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 15,
-                name: "大连泰联食品有限公司",
-                location: "大连市",
-                coords: [39.61477555555556, 122.74595027777778],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 16,
-                name: "庄河市黑岛镇冷家船厂",
-                location: "大连市",
-                coords: [39.683640000000004, 123.21527000000001],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 17,
-                name: "大连万悦工业有限公司",
-                location: "大连市",
-                coords: [39.22281194444444, 121.95087444444445],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 18,
-                name: "大连弘润莲花食品有限公司",
-                location: "大连市",
-                coords: [39.08336833333333, 121.9115438888889],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 19,
-                name: "大连弘润莲花食品有限公司",
-                location: "大连市",
-                coords: [39.08336833333333, 121.9115438888889],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 20,
-                name: "庄河市阳合油脂科技有限公司",
-                location: "大连市",
-                coords: [39.84044666666667, 123.28744194444444],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 21,
-                name: "大连恒鑫瑞机械有限公司",
-                location: "大连市",
-                coords: [38.80534611111111, 121.14297027777778],
-                pollutants: ["废气"]
-            },
-            {
-                id: 22,
-                name: "大连弘润全谷物食品有限公司",
-                location: "大连市",
-                coords: [39.09747361111111, 121.91229055555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 23,
-                name: "大连通垠电缆制造有限公司",
-                location: "大连市",
-                coords: [38.79995833333333, 121.15724166666667],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 24,
-                name: "大连中旭玻璃钢制品有限公司",
-                location: "大连市",
-                coords: [39.4715175, 121.74517916666667],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 25,
-                name: "大连鑫缘物资再生利用有限公司",
-                location: "大连市",
-                coords: [39.59477416666667, 121.92630166666667],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 26,
-                name: "高新区大郁宠物医院中心",
-                location: "大连市",
-                coords: [38.87752361111111, 121.505575],
-                pollutants: ["废水", "噪声"]
-            },
-            {
-                id: 27,
-                name: "大连金德瑞球铁保持架有限公司",
-                location: "大连市",
-                coords: [39.42419472222222, 121.96009083333333],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 28,
-                name: "博林（大连）建筑材料有限公司",
-                location: "大连市",
-                coords: [39.56522416666667, 121.38936916666667],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 29,
-                name: "大连东泰产业废弃物处理有限公司",
-                location: "大连市",
-                coords: [38.97138166666667, 121.84889694444445],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 30,
-                name: "大连瑞派宠诺宠物医院有限公司",
-                location: "大连市",
-                coords: [38.95967722222222, 121.58483583333334],
-                pollutants: ["废水"]
-            },
-            {
-                id: 31,
-                name: "大连道依茨大柴发动机有限公司",
-                location: "大连市",
-                coords: [39.03155305555556, 121.58870777777778],
-                pollutants: ["废气", "土壤"]
-            },
-            {
-                id: 32,
-                name: "大连金星新材料科技有限公司",
-                location: "大连市",
-                coords: [39.54814583333333, 122.65345166666667],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 33,
-                name: "大连来克精化有限公司",
-                location: "大连市",
-                coords: [39.41806666666667, 121.7112388888889],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 34,
-                name: "大连盈驰一诺生态修复有限公司",
-                location: "大连市",
-                coords: [39.64869833333333, 122.07786555555556],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 35,
-                name: "大连恒通弹簧有限公司",
-                location: "大连市",
-                coords: [39.09246416666667, 121.91840222222223],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 36,
-                name: "大连上源智能装备制造有限公司",
-                location: "大连市",
-                coords: [39.22907, 121.79698638888889],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 37,
-                name: "大连瑞腾冲压有限公司",
-                location: "大连市",
-                coords: [38.96754222222222, 121.84551083333333],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 38,
-                name: "融科（大连）储能科技有限公司",
-                location: "大连市",
-                coords: [39.33667027777778, 121.73577361111111],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 39,
-                name: "大连金事达塑料集装袋有限公司",
-                location: "大连市",
-                coords: [39.4596625, 121.91769472222223],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 40,
-                name: "大连明晶智能制造有限公司",
-                location: "大连市",
-                coords: [39.14390805555556, 121.98469194444444],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 41,
-                name: "大连骏翔电力器材有限公司",
-                location: "大连市",
-                coords: [39.49863888888889, 121.80277777777778],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 42,
-                name: "大连歌瑞恩实业有限公司",
-                location: "大连市",
-                coords: [39.06411805555556, 121.72910055555556],
-                pollutants: ["废气"]
-            },
-            {
-                id: 43,
-                name: "连拓汽车技术（大连）有限公司",
-                location: "大连市",
-                coords: [39.05091777777778, 121.81481805555556],
-                pollutants: ["废气"]
-            },
-            {
-                id: 44,
-                name: "大连美屋食品有限公司",
-                location: "大连市",
-                coords: [39.28958833333333, 121.80835166666667],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 45,
-                name: "大连市金普新区和润水产品有限责任公司",
-                location: "大连市",
-                coords: [39.29032305555555, 122.21859277777778],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 46,
-                name: "大连金泽安全环境科技有限公司",
-                location: "大连市",
-                coords: [39.91705194444444, 121.90746000000001],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 47,
-                name: "大连船用推进器有限公司",
-                location: "大连市",
-                coords: [39.34709722222222, 121.74064722222222],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 48,
-                name: "大连盈驰一诺生态修复有限公司",
-                location: "大连市",
-                coords: [39.64338638888889, 122.08158944444444],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 49,
-                name: "大连天洲酒业有限公司",
-                location: "大连市",
-                coords: [39.72739055555556, 121.70437527777778],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 50,
-                name: "大连长之琳科技股份有限公司",
-                location: "大连市",
-                coords: [39.09614361111111, 121.89167444444445],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 51,
-                name: "大连棒棰岛海参发展有限公司",
-                location: "大连市",
-                coords: [39.15483055555555, 122.14280555555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 52,
-                name: "大连兴环能源科技有限公司",
-                location: "大连市",
-                coords: [39.54832611111111, 121.30685138888889],
-                pollutants: ["废气"]
-            },
-            {
-                id: 53,
-                name: "大连大学",
-                location: "大连市",
-                coords: [39.10821944444444, 121.81554722222222],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 54,
-                name: "大连西太平洋石油化工有限公司",
-                location: "大连市",
-                coords: [38.98529444444444, 121.84140277777778],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 55,
-                name: "大连美佳科技有限公司",
-                location: "大连市",
-                coords: [39.15326361111111, 121.71172277777778],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 56,
-                name: "大连欧派科技有限公司",
-                location: "大连市",
-                coords: [39.05739138888889, 121.72947166666667],
-                pollutants: ["废气"]
-            },
-            {
-                id: 57,
-                name: "大连恒力混凝土有限公司",
-                location: "大连市",
-                coords: [39.56376111111111, 121.32461111111111],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 58,
-                name: "长海县广鹿岛镇塘洼村海忠民宿",
-                location: "大连市",
-                coords: [39.17425027777778, 122.3605975],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 59,
-                name: "大连恒基新润水务有限公司",
-                location: "大连市",
-                coords: [39.41543694444444, 121.70999722222222],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 60,
-                name: "大连未来食品有限公司",
-                location: "大连市",
-                coords: [39.48161166666667, 121.73249083333333],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 61,
-                name: "瓦房店威远滚动体制造有限公司",
-                location: "大连市",
-                coords: [39.68012694444444, 121.99585527777778],
-                pollutants: ["废气", "土壤", "噪声"]
-            },
-            {
-                id: 62,
-                name: "大连瑞杰医院有限公司",
-                location: "大连市",
-                coords: [38.87153138888889, 121.61834666666666],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 63,
-                name: "大连美兆综合医院有限公司",
-                location: "大连市",
-                coords: [38.92192611111111, 121.66464555555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 64,
-                name: "大连鑫源金属有限公司",
-                location: "大连市",
-                coords: [39.07403194444444, 121.81108083333333],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 65,
-                name: "大连铭水食品有限责任公司",
-                location: "大连市",
-                coords: [39.04920638888889, 121.82213805555555],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 66,
-                name: "大连薪汇达建筑材料制造有限公司",
-                location: "大连市",
-                coords: [38.92708944444445, 121.17745027777778],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 67,
-                name: "大连吉兴嘉生物科技有限公司",
-                location: "大连市",
-                coords: [39.2218975, 121.78980666666667],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 68,
-                name: "大连高佳化工有限公司",
-                location: "大连市",
-                coords: [39.4217, 121.71415305555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 69,
-                name: "辽宁中址瑞报废汽车回收拆解有限公司",
-                location: "大连市",
-                coords: [39.08407944444445, 121.67079305555556],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 70,
-                name: "大连新美汇能动力装备有限公司",
-                location: "大连市",
-                coords: [38.81137833333333, 121.1747825],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 71,
-                name: "大连金鑫水产品有限公司",
-                location: "大连市",
-                coords: [39.12746388888889, 122.08147555555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 72,
-                name: "创造空间木业（大连）有限公司",
-                location: "大连市",
-                coords: [39.54447027777778, 121.92248611111111],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 73,
-                name: "安特思（大连）科技有限公司",
-                location: "大连市",
-                coords: [39.02894388888889, 121.81539527777778],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 74,
-                name: "大连金宝至电子股份有限公司",
-                location: "大连市",
-                coords: [39.04804666666667, 121.79931694444444],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 75,
-                name: "庄河市金岛渔船修造有限公司",
-                location: "大连市",
-                coords: [39.76138222222222, 123.29107805555556],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 76,
-                name: "大连润琪精密制造有限公司",
-                location: "大连市",
-                coords: [39.57743, 121.84563138888889],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 77,
-                name: "大连德盛木业有限公司",
-                location: "大连市",
-                coords: [39.65792194444444, 122.94364694444445],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 78,
-                name: "大连凯威特斯半导体科技有限公司",
-                location: "大连市",
-                coords: [39.08165138888889, 121.85987916666666],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 79,
-                name: "大连谷歌卫生用品有限公司",
-                location: "大连市",
-                coords: [39.07642166666667, 121.70719833333334],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 80,
-                name: "大连百城轴承有限公司",
-                location: "大连市",
-                coords: [39.57920277777778, 121.98401111111111],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 81,
-                name: "大连雨林矿产有限责任公司",
-                location: "大连市",
-                coords: [40.039625, 122.04947777777778],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 82,
-                name: "大连核锐科技有限公司",
-                location: "大连市",
-                coords: [39.34539611111111, 121.74434305555556],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 83,
-                name: "大连九信作物科学有限公司",
-                location: "大连市",
-                coords: [39.40877472222222, 121.72774194444444],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 84,
-                name: "大连百宜禾新能源有限公司",
-                location: "大连市",
-                coords: [39.73246777777778, 122.79214527777778],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 85,
-                name: "大连隆兴鱼粉加工有限公司",
-                location: "大连市",
-                coords: [39.79558638888889, 123.41106027777778],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 86,
-                name: "大连中晟元生物质科技有限公司",
-                location: "大连市",
-                coords: [40.02450061111111, 122.08266677777778],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 87,
-                name: "佳能医疗器械（大连）有限公司",
-                location: "大连市",
-                coords: [39.06300277777778, 121.76355055555556],
-                pollutants: ["废气", "土壤"]
-            },
-            {
-                id: 88,
-                name: "大连普康宁精神病医院有限公司",
-                location: "大连市",
-                coords: [38.97597805555556, 121.63718611111111],
-                pollutants: ["废气"]
-            },
-            {
-                id: 89,
-                name: "大连明正喷胶棉有限公司",
-                location: "大连市",
-                coords: [39.42659083333333, 121.78156777777778],
-                pollutants: ["废气", "土壤"]
-            },
-            {
-                id: 90,
-                name: "领君科技（大连）有限公司",
-                location: "大连市",
-                coords: [39.22767805555556, 121.94862833333334],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 91,
-                name: "大连鸿金机械制造有限责任公司",
-                location: "大连市",
-                coords: [39.77482222222222, 121.91823444444445],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 92,
-                name: "大连澳薪木业有限公司",
-                location: "大连市",
-                coords: [38.94603083333333, 121.31496138888889],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 93,
-                name: "大连金普新区高城山医院有限公司",
-                location: "大连市",
-                coords: [39.06080583333333, 121.82692694444444],
-                pollutants: ["废气"]
-            },
-            {
-                id: 94,
-                name: "微能汇通（大连）电力技术有限公司",
-                location: "大连市",
-                coords: [39.67550138888889, 121.91492333333334],
-                pollutants: ["废气"]
-            },
-            {
-                id: 95,
-                name: "大连义道诚金属制品有限公司",
-                location: "大连市",
-                coords: [39.15612444444444, 121.9238138888889],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 96,
-                name: "大连市中山区城市更新事务中心",
-                location: "大连市",
-                coords: [38.90828611111111, 121.70347222222222],
-                pollutants: ["废气"]
-            },
-            {
-                id: 97,
-                name: "大连力佳化学制品有限公司",
-                location: "大连市",
-                coords: [38.97150833333333, 121.84535555555556],
-                pollutants: ["废气", "土壤"]
-            },
-            {
-                id: 98,
-                name: "大连诚华隆机械设备有限公司",
-                location: "大连市",
-                coords: [38.90042111111111, 121.15501888888889],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 99,
-                name: "大连鹏伸精密铸件制造有限公司",
-                location: "大连市",
-                coords: [39.34493472222222, 122.000035],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 100,
-                name: "辽宁东方风力发电有限公司",
-                location: "大连市",
-                coords: [39.73913611111111, 121.48075305555556],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 101,
-                name: "晖致制药（大连）有限公司",
-                location: "大连市",
-                coords: [39.05981083333333, 121.76427222222222],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 102,
-                name: "大连金州金吉特钢制品厂",
-                location: "大连市",
-                coords: [39.25428888888889, 121.79628055555555],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 103,
-                name: "大连博尔化工有限公司",
-                location: "大连市",
-                coords: [39.40333916666667, 121.72081194444445],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 104,
-                name: "庄河市黑岛镇岩硕农产品加工厂",
-                location: "大连市",
-                coords: [39.67364833333333, 123.15482527777778],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 105,
-                name: "大连德宇机械有限公司",
-                location: "大连市",
-                coords: [39.76402861111111, 123.06348],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 106,
-                name: "大连德泰小窑湾污水处理有限公司金普新区生态环保分公司",
-                location: "大连市",
-                coords: [39.18959611111111, 121.73748055555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 107,
-                name: "顺盛（大连）汽车部件有限公司",
-                location: "大连市",
-                coords: [39.03474638888889, 121.82739388888889],
-                pollutants: ["废气"]
-            },
-            {
-                id: 108,
-                name: "大连易丰升金属有限公司",
-                location: "大连市",
-                coords: [38.99721555555555, 121.52696388888889],
-                pollutants: ["废气"]
-            },
-            {
-                id: 109,
-                name: "大连寺大汽车配件有限公司",
-                location: "大连市",
-                coords: [39.08127916666667, 121.8588925],
-                pollutants: ["废气"]
-            },
-            {
-                id: 110,
-                name: "中科（大连）医疗设备有限公司",
-                location: "大连市",
-                coords: [39.14154194444444, 121.9895525],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 111,
-                name: "大连鑫宏报废汽车回收拆解有限公司",
-                location: "大连市",
-                coords: [38.91309472222222, 121.19866111111111],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 112,
-                name: "大连旅泰投资有限公司",
-                location: "大连市",
-                coords: [38.87416694444444, 121.11838138888889],
-                pollutants: ["废气"]
-            },
-            {
-                id: 113,
-                name: "恒力发动机（大连）有限公司",
-                location: "大连市",
-                coords: [39.51861944444445, 121.31422222222222],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 114,
-                name: "大连亚明汽车部件股份有限公司",
-                location: "大连市",
-                coords: [38.81927388888889, 121.17231222222222],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 115,
-                name: "大连汉方药业有限公司",
-                location: "大连市",
-                coords: [38.98388638888889, 121.3587975],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 116,
-                name: "大连叁颗牙智造科技有限公司",
-                location: "大连市",
-                coords: [39.0565775, 121.78304194444444],
-                pollutants: ["废气"]
-            },
-            {
-                id: 117,
-                name: "大连平丰汽车零部件有限公司",
-                location: "大连市",
-                coords: [39.033385, 121.82737166666667],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 118,
-                name: "大连盛冶科技有限公司",
-                location: "大连市",
-                coords: [39.24232833333333, 121.96951777777778],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 119,
-                name: "大连荣峰达塑胶科技有限公司",
-                location: "大连市",
-                coords: [39.20615638888889, 121.93698555555556],
-                pollutants: ["废气"]
-            },
-            {
-                id: 120,
-                name: "大连环友屏蔽电泵有限公司",
-                location: "大连市",
-                coords: [38.86621388888889, 121.23352222222222],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 121,
-                name: "大连仓敷橡胶零部件有限公司",
-                location: "大连市",
-                coords: [38.93130388888889, 121.29225388888889],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 122,
-                name: "大连宝原核设备股份有限公司",
-                location: "大连市",
-                coords: [38.993130000000005, 121.65598000000001],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 123,
-                name: "优美汇科技发展(大连)有限公司",
-                location: "大连市",
-                coords: [39.06609277777778, 121.72465083333334],
-                pollutants: ["废气"]
-            },
-            {
-                id: 124,
-                name: "大连金程德生物科技有限公司",
-                location: "大连市",
-                coords: [39.20321111111111, 121.6083775],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 125,
-                name: "常茂（大连）新材料有限公司",
-                location: "大连市",
-                coords: [39.5552775, 121.30650194444444],
-                pollutants: ["废气"]
-            },
-            {
-                id: 126,
-                name: "大连好好宠医宠物医院有限公司",
-                location: "大连市",
-                coords: [38.91784555555555, 121.59195083333333],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 127,
-                name: "大连科兴矿山机械制造有限公司",
-                location: "大连市",
-                coords: [39.67412888888889, 122.95134305555556],
-                pollutants: ["废气", "土壤", "噪声"]
-            },
-            {
-                id: 128,
-                name: "大连海阔饲料有限公司",
-                location: "大连市",
-                coords: [39.67161944444444, 123.12662777777777],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 129,
-                name: "大连顺发建筑防水技术有限公司",
-                location: "大连市",
-                coords: [39.06830944444444, 122.99695138888889],
-                pollutants: ["废气"]
-            },
-            {
-                id: 130,
-                name: "旅顺胜利机械厂",
-                location: "大连市",
-                coords: [38.92487527777778, 121.31988388888889],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 131,
-                name: "大连华通机车车辆修造有限公司",
-                location: "大连市",
-                coords: [39.13566722222222, 121.72463194444444],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 132,
-                name: "大连三峰港口机械设备有限公司",
-                location: "大连市",
-                coords: [39.54160861111111, 121.37438361111111],
-                pollutants: ["废气", "土壤", "噪声"]
-            },
-            {
-                id: 133,
-                name: "大连红力兴晟食品有限公司",
-                location: "大连市",
-                coords: [39.53866055555556, 121.984115],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 134,
-                name: "上实环境水务（大连）有限公司",
-                location: "大连市",
-                coords: [39.316370833333335, 121.74027444444444],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 135,
-                name: "大连新飞船机有限公司",
-                location: "大连市",
-                coords: [38.92374472222222, 121.28328638888889],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 136,
-                name: "科兴（大连）疫苗技术有限公司",
-                location: "大连市",
-                coords: [39.05893138888889, 121.86407555555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 137,
-                name: "大连承远压力部件有限公司",
-                location: "大连市",
-                coords: [38.80883666666666, 121.17152305555556],
-                pollutants: ["废气", "土壤", "噪声"]
-            },
-            {
-                id: 138,
-                name: "大连市志德高级中学有限公司",
-                location: "大连市",
-                coords: [39.33162472222222, 121.84573583333334],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 139,
-                name: "大连美嘉印刷有限公司",
-                location: "大连市",
-                coords: [39.09747361111111, 121.91229055555556],
-                pollutants: ["废气"]
-            },
-            {
-                id: 140,
-                name: "大连嘉盛达新能源有限公司",
-                location: "大连市",
-                coords: [39.420066666666665, 122.00225277777778],
-                pollutants: ["废气"]
-            },
-            {
-                id: 141,
-                name: "大连国际商贸大厦有限公司瑞诗酒店",
-                location: "大连市",
-                coords: [38.91477027777778, 121.6303675],
-                pollutants: ["废气"]
-            },
-            {
-                id: 142,
-                name: "大连滨城活塞制造有限公司",
-                location: "大连市",
-                coords: [39.08059805555556, 121.70960583333333],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 143,
-                name: "大连融科储能集团股份有限公司",
-                location: "大连市",
-                coords: [39.55615611111111, 122.62835666666666],
-                pollutants: ["废气"]
-            },
-            {
-                id: 144,
-                name: "大连龙元堂药业有限公司",
-                location: "大连市",
-                coords: [38.86524611111111, 121.51940305555556],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 145,
-                name: "大连泰阳水产食品有限公司",
-                location: "大连市",
-                coords: [39.61195583333333, 122.73749861111111],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 146,
-                name: "晖致制药（大连）有限公司",
-                location: "大连市",
-                coords: [39.05981083333333, 121.76427222222222],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 147,
-                name: "慈铭奥亚医院（大连）有限公司",
-                location: "大连市",
-                coords: [38.87692861111111, 121.60497555555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 148,
-                name: "大连福雷克斯空调配件有限公司",
-                location: "大连市",
-                coords: [39.0285425, 121.81377666666666],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 149,
-                name: "大连昕迪实验室科技有限公司",
-                location: "大连市",
-                coords: [38.85852583333333, 121.50658055555556],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 150,
-                name: "大连晟态合环境科技有限公司",
-                location: "大连市",
-                coords: [39.40525, 122.097975],
-                pollutants: ["废气"]
-            },
-            {
-                id: 151,
-                name: "迈艾特（大连）汽车制动部件有限公司",
-                location: "大连市",
-                coords: [39.1334475, 121.97694194444444],
-                pollutants: ["废气", "土壤", "噪声"]
-            },
-            {
-                id: 152,
-                name: "大连智勇铸工有限公司",
-                location: "大连市",
-                coords: [39.62045333333333, 121.93369027777778],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 153,
-                name: "润新微电子（大连）有限公司",
-                location: "大连市",
-                coords: [38.84384416666667, 121.42852527777778],
-                pollutants: ["废气"]
-            },
-            {
-                id: 154,
-                name: "京瓷（大连）机器有限公司",
-                location: "大连市",
-                coords: [39.05179333333333, 121.78374861111111],
-                pollutants: ["废气"]
-            },
-            {
-                id: 155,
-                name: "大连友谊肉联食品有限公司",
-                location: "大连市",
-                coords: [39.12412305555556, 121.73911111111111],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 156,
-                name: "中国检验认证集团辽宁有限公司大连分公司",
-                location: "大连市",
-                coords: [39.04318277777778, 121.8035725],
-                pollutants: ["废气"]
-            },
-            {
-                id: 157,
-                name: "大连大北农牧业科技有限责任公司",
-                location: "大连市",
-                coords: [39.59570833333333, 121.92342527777778],
-                pollutants: ["废气"]
-            },
-            {
-                id: 158,
-                name: "大连天宝绿色食品股份有限公司",
-                location: "大连市",
-                coords: [39.13111972222222, 121.72464194444444],
-                pollutants: ["废气"]
-            },
-            {
-                id: 159,
-                name: "大连美兆综合医院有限公司",
-                location: "大连市",
-                coords: [38.92993694444444, 121.66478583333333],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 160,
-                name: "大连奥森制药有限公司",
-                location: "大连市",
-                coords: [39.56290444444444, 122.64604027777778],
-                pollutants: ["废气"]
-            },
-            {
-                id: 161,
-                name: "奥泽新材料（大连）有限公司",
-                location: "大连市",
-                coords: [39.13231333333333, 121.70031194444445],
-                pollutants: ["废气"]
-            },
-            {
-                id: 162,
-                name: "大连鼎华医院有限公司",
-                location: "大连市",
-                coords: [39.09476138888889, 121.68572694444445],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 163,
-                name: "大连金水涂装工程有限公司",
-                location: "大连市",
-                coords: [39.19035833333333, 121.75144444444445],
-                pollutants: ["废气", "土壤"]
-            },
-            {
-                id: 164,
-                name: "大连浩和食品有限公司",
-                location: "大连市",
-                coords: [39.05702972222222, 121.85973472222222],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 165,
-                name: "深蓝特医（大连）生物科技有限公司",
-                location: "大连市",
-                coords: [39.08357583333333, 121.90829333333334],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 166,
-                name: "奇瑞汽车股份有限公司大连分公司",
-                location: "大连市",
-                coords: [39.05107555555556, 121.8457275],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 167,
-                name: "大连北黄海实业发展集团有限公司",
-                location: "大连市",
-                coords: [39.53427972222222, 122.60341583333333],
-                pollutants: ["废气"]
-            },
-            {
-                id: 168,
-                name: "大连枫叶双语学校",
-                location: "大连市",
-                coords: [39.08762694444444, 122.01972305555556],
-                pollutants: ["废气"]
-            },
-            {
-                id: 169,
-                name: "辽宁航恒宝林电缆集团有限公司",
-                location: "大连市",
-                coords: [39.1820925, 122.09969555555556],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 170,
-                name: "大连龙尧塑料机械有限公司",
-                location: "大连市",
-                coords: [38.9329975, 121.25225027777778],
-                pollutants: ["废气", "土壤", "噪声"]
-            },
-            {
-                id: 171,
-                name: "大连紫光凌水污水处理有限公司",
-                location: "大连市",
-                coords: [38.86601166666667, 121.535305],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 172,
-                name: "大连柏年盛康血液透析中心有限公司",
-                location: "大连市",
-                coords: [39.06299194444444, 121.84437138888889],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 173,
-                name: "大连汉顿工业有限公司",
-                location: "大连市",
-                coords: [39.54392277777778, 122.63299055555556],
-                pollutants: ["废气"]
-            },
-            {
-                id: 174,
-                name: "大连医嘉医疗健康产业园有限公司",
-                location: "大连市",
-                coords: [39.04487972222222, 121.83488583333333],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 175,
-                name: "大连亚明汽车部件股份有限公司",
-                location: "大连市",
-                coords: [38.81975833333333, 121.17098111111112],
-                pollutants: ["废气", "土壤", "噪声"]
-            },
-            {
-                id: 176,
-                name: "大连幸福里仁爱综合医院有限责任公司",
-                location: "大连市",
-                coords: [39.053043055555555, 121.77357222222222],
-                pollutants: ["废气"]
-            },
-            {
-                id: 177,
-                name: "恒力造船（大连）有限公司",
-                location: "大连市",
-                coords: [39.54553361111111, 121.39431194444445],
-                pollutants: ["废气", "废水", "土壤", "噪声"]
-            },
-            {
-                id: 178,
-                name: "营口兴和特耐有限公司",
-                location: "营口市",
-                coords: [40.64358888888889, 122.3108225],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 179,
-                name: "营口语博水泥制品有限公司",
-                location: "营口市",
-                coords: [40.6492875, 122.4218875],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 180,
-                name: "营口市新亿达水泥构件厂",
-                location: "营口市",
-                coords: [40.68517361111111, 122.31499583333334],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 181,
-                name: "营口海达新材料科技有限公司",
-                location: "营口市",
-                coords: [40.64563388888889, 122.31619611111111],
-                pollutants: ["废气", "土壤", "噪声"]
-            },
-            {
-                id: 182,
-                name: "营口大正塑料科技有限公司",
-                location: "营口市",
-                coords: [40.154758333333334, 122.06420333333333],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 183,
-                name: "营口鑫垚能源环保科技有限公司",
-                location: "营口市",
-                coords: [40.15682944444445, 122.0670475],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 184,
-                name: "辽宁炬森能源集团有限公司",
-                location: "营口市",
-                coords: [40.14749527777778, 122.05663861111111],
-                pollutants: ["废气"]
-            },
-            {
-                id: 185,
-                name: "盖州市博隆耐火材料有限公司",
-                location: "营口市",
-                coords: [40.44963305555556, 122.4384375],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 186,
-                name: "辽阳市辽盘防水材料厂",
-                location: "辽阳市",
-                coords: [41.40304444444444, 123.49066388888889],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 187,
-                name: "灯塔市嘉玺牧业有限公司",
-                location: "辽阳市",
-                coords: [41.51390638888889, 123.19898722222222],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 188,
-                name: "辽阳冀东水泥有限公司",
-                location: "辽阳市",
-                coords: [41.30937, 123.33606],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 189,
-                name: "辽阳东方波特蓝环保科技有限公司",
-                location: "辽阳市",
-                coords: [41.354233333333335, 123.50391833333334],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 190,
-                name: "灯塔市铧顺矿业有限公司",
-                location: "辽阳市",
-                coords: [41.35141972222222, 123.50433944444444],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 191,
-                name: "辽阳县金鑫塑料加工厂",
-                location: "辽阳市",
-                coords: [41.18346694444444, 122.85871777777778],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 192,
-                name: "辽阳县君伟再生资源回收站",
-                location: "辽阳市",
-                coords: [41.22128472222222, 123.01686305555555],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 193,
-                name: "沈阳红梅食品有限公司",
-                location: "沈阳市",
-                coords: [41.94262027777778, 123.57910555555555],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 194,
-                name: "航达新科技（沈阳）有限公司",
-                location: "沈阳市",
-                coords: [41.75351, 123.21638],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 195,
-                name: "沈阳中航机电三洋制冷设备有限公司",
-                location: "沈阳市",
-                coords: [41.77474861111111, 123.26145388888889],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 196,
-                name: "沈阳沃华森新型装饰材料有限公司",
-                location: "沈阳市",
-                coords: [41.82444027777778, 123.22881833333334],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 197,
-                name: "沈阳创新合金有限公司",
-                location: "沈阳市",
-                coords: [41.79380222222222, 123.22449],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 198,
-                name: "沈阳华美绿建高新科技材料有限公司",
-                location: "沈阳市",
-                coords: [41.92625888888889, 123.34486],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 199,
-                name: "沈阳亿兴电力设备有限公司",
-                location: "沈阳市",
-                coords: [41.81184388888889, 123.22383388888889],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 200,
-                name: "沈阳田源集中供热有限公司",
-                location: "沈阳市",
-                coords: [41.95177777777778, 123.15579027777778],
-                pollutants: ["废气"]
-            },
-            {
-                id: 201,
-                name: "沈阳圣禹热力有限公司",
-                location: "沈阳市",
-                coords: [41.86923944444444, 123.28728527777778],
-                pollutants: ["废气"]
-            },
-            {
-                id: 202,
-                name: "沈阳鑫奥线缆制造有限公司",
-                location: "沈阳市",
-                coords: [41.60847222222222, 122.8504111111111],
-                pollutants: ["噪声"]
-            },
-            {
-                id: 203,
-                name: "沈阳市露佳酒厂",
-                location: "沈阳市",
-                coords: [41.4273075, 122.86080194444445],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 204,
-                name: "辽中县得达制胶有限责任公司",
-                location: "沈阳市",
-                coords: [41.49233333333333, 122.83406111111111],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 205,
-                name: "沈阳新泷口酒业有限公司",
-                location: "沈阳市",
-                coords: [41.88689027777778, 123.55399999999999],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 206,
-                name: "青岛海达盛冷凝器有限公司沈阳分公司",
-                location: "沈阳市",
-                coords: [41.92859861111111, 123.56189305555555],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 207,
-                name: "沈阳沈北康健医疗有限公司康健医院",
-                location: "沈阳市",
-                coords: [42.04281388888889, 123.526685],
-                pollutants: ["废水"]
-            },
-            {
-                id: 208,
-                name: "佛吉亚斯林达安全科技（沈阳）有限公司",
-                location: "沈阳市",
-                coords: [41.96176027777778, 123.34555138888889],
-                pollutants: ["废气"]
-            },
-            {
-                id: 209,
-                name: "辽宁博澳恩普生物科技有限公司",
-                location: "沈阳市",
-                coords: [41.89591861111111, 123.57202944444444],
-                pollutants: ["废气", "废水", "土壤"]
-            },
-            {
-                id: 210,
-                name: "沈阳炽炎科技有限公司",
-                location: "沈阳市",
-                coords: [41.99634305555556, 123.37622305555555],
-                pollutants: ["废气", "噪声"]
-            },
-            {
-                id: 211,
-                name: "沈阳市新盛酿酒厂",
-                location: "沈阳市",
-                coords: [42.06773611111111, 123.42830166666667],
-                pollutants: ["废气", "废水"]
-            },
-            {
-                id: 212,
-                name: "辽宁民威设备制造有限公司",
-                location: "沈阳市",
-                coords: [41.95131916666667, 123.46906638888889],
-                pollutants: ["废气"]
-            },
-            {
-                id: 213,
-                name: "沈阳奎斯特李食品有限公司",
-                location: "沈阳市",
-                coords: [41.91290944444444, 123.371355],
-                pollutants: ["废气", "废水", "噪声"]
-            },
-            {
-                id: 214,
-                name: "沈阳精合数控科技开发有限公司",
-                location: "沈阳市",
-                coords: [41.98024611111111, 123.37078583333333],
-                pollutants: ["废气"]
-            }
-        ];
+        // 1. 初始化地图
+        const map = L.map('map', { zoomControl: false }).setView([41.0, 122.0], 8);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // 当前显示的企业列表
-        let currentEnterprises = [];
-        let markers = [];
-        let currentFilter = "全部企业";
-        let map; // 地图实例
-        const itemsPerPage = 10;
-        let currentPage = 1;
-        
-        // 初始化地图
-        function initMap() {
-            const mapInstance = L.map('map').setView(liaoningCenter, 8);
+        // 2. 加载现代风格地图图层
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        // 3. 坐标转换工具函数 (处理度分秒格式)
+        function parseCoordinate(coordStr) {
+            if (!coordStr || typeof coordStr !== 'string') return null;
             
-            // 使用可靠的CartoDB地图服务
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-                subdomains: 'abcd',
-                maxZoom: 19
-            }).addTo(mapInstance);
+            // 清理字符串，移除空格
+            let str = coordStr.trim();
             
-            // 添加辽宁省边界（简化版矩形范围）
-            const liaoningBounds = [
-                [38.7, 118.8],  // 西南坐标
-                [43.0, 125.8]   // 东北坐标
-            ];
+            // 尝试匹配多种格式：39°28′47.801″ 或 39 度 28 分 47.801 秒 或 39°11'22.720"
+            // 统一替换分隔符
+            str = str.replace(/度/g, '°').replace(/分/g, '′').replace(/秒/g, '″');
+            str = str.replace(/'/g, '′').replace(/"/g, '″'); // 处理英文引号
             
-            // 添加边界矩形
-            L.rectangle(liaoningBounds, {
-                color: "#4fc3f7",
-                weight: 2,
-                fillOpacity: 0.05
-            }).addTo(mapInstance);
+            const degMatch = str.match(/(\d+)\s*°/);
+            const minMatch = str.match(/(\d+)\s*′/);
+            const secMatch = str.match(/(\d+(?:\.\d+)?)\s*″/);
+
+            if (degMatch && minMatch && secMatch) {
+                const deg = parseFloat(degMatch[1]);
+                const min = parseFloat(minMatch[1]);
+                const sec = parseFloat(secMatch[1]);
+                return deg + (min / 60) + (sec / 3600);
+            }
             
-            return mapInstance;
+            // 如果已经是数字
+            const num = parseFloat(str);
+            if (!isNaN(num)) return num;
+
+            return null;
         }
 
-        // 在地图上添加企业标记
-        function addMarkersToMap(mapInstance, enterprises) {
-            // 清除现有标记
-            markers.forEach(marker => mapInstance.removeLayer(marker));
-            markers = [];
-            
-            enterprises.forEach(enterprise => {
-                // 创建标记元素
-                const markerElement = document.createElement('div');
-                markerElement.className = 'custom-marker';
-                markerElement.innerHTML = `<i class="fas fa-industry"></i>`;
-                
-                // 创建自定义标记
-                const marker = L.marker(enterprise.coords, {
-                    title: `${enterprise.name}\n污染物: ${enterprise.pollutants.join(', ')}`,
-                    alt: enterprise.name,
-                    riseOnHover: true,
-                    icon: L.divIcon({
-                        html: markerElement.outerHTML,
-                        className: '',
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 20]
-                    })
-                }).addTo(mapInstance);
-                
-                // 绑定弹出框（显示企业名称和污染物）
-                marker.bindPopup(`
-                    <div style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">
-                        <i class="fas fa-industry"></i> ${enterprise.name}
+        // 4. 完整数据 (214 条)
+        const rawData = [
+            {name: "大连中远海运能源供应链有限公司", lat: 39.479945, lng: 121.323899, pollutants: ["大气", "水体"]},
+            {name: "大连威嘉船舶配件有限公司", lat: 39.083143, lng: 121.678662, pollutants: ["大气", "水体"]},
+            {name: "中石化催化剂大连有限公司", lat: 38.937522, lng: 121.270186, pollutants: ["大气", "水体", "土壤"]},
+            {name: "大连沙河口胃康医院有限公司", lat: 38.942982, lng: 121.557718, pollutants: ["水体", "噪声"], address: "辽宁省大连市沙河口区西北路253号"},
+            {name: "大连固特异轮胎有限公司", lat: 39.424691, lng: 121.915530, pollutants: ["大气", "噪声"], address: "大连市普兰店市海湾工业区振兴街8号"},
+            {name: "大连锦宇金属制品有限公司", lat: 39.189644, lng: 121.808694, pollutants: ["大气", "噪声"], address: "大连市保税区二十里堡街道广宁寺村"},
+            {name: "大连铎泽再生物资回收有限公司", lat: 38.858326, lng: 121.236099, pollutants: ["大气", "水体"], address: "大连市旅顺口区水师营街道"},
+            {name: "大连亚明汽车部件股份有限公司", lat: 38.819273, lng: 121.172312, pollutants: ["大气"], address: "大连市旅顺口区开发区华洋路17号"},
+            {name: "大连泷田金属制品有限公司", lat: 39.093867, lng: 121.920161, pollutants: ["大气", "噪声"]},
+            {name: "大连金普新区晓慧服装辅料加工厂", lat: 39.112131, lng: 121.728172, pollutants: ["大气", "噪声"], address: "大连市金普新区中长街道中长村丘（地）号38-75-3"},
+            {name: "大连天童金属表面处理有限公司", lat: 38.982195, lng: 121.397851, pollutants: ["大气"]},
+            {name: "大连天兴盛康源饲料有限公司", lat: 39.720714, lng: 122.958132, pollutants: ["大气", "噪声"], address: "大连市庄河市徐岭镇庄岫路345-6号"},
+            {name: "大连达伦特香氛科技有限公司", lat: 39.346658, lng: 121.982460, pollutants: ["水体"], address: "大连市普兰店市太平街道唐房社区西北屯104号"},
+            {name: "大连国华供热有限公司", lat: 38.971661, lng: 121.531231, pollutants: ["大气", "水体", "噪声"]},
+            {name: "大连泰联食品有限公司", lat: 39.614776, lng: 122.745950, pollutants: ["大气", "水体"], address: "大连市庄河市辽宁省庄河市大郑镇高阳村郭店屯"},
+            {name: "庄河市黑岛镇冷家船厂", lat: 39.683640, lng: 123.215270, pollutants: ["大气", "水体", "土壤"]},
+            {name: "大连万悦工业有限公司", lat: 39.222812, lng: 121.950874, pollutants: ["大气", "水体", "土壤"], address: "大连市保税区辽宁省大连保税区亮甲店街道北苍屯72号"},
+            {name: "大连弘润莲花食品有限公司", lat: 39.083368, lng: 121.911544, pollutants: ["大气", "水体"], address: "大连市金普新区辽宁省大连市金普新区董家沟街道光谷南路 33 号"},
+            {name: "大连弘润莲花食品有限公司", lat: 39.083368, lng: 121.911544, pollutants: ["大气", "水体"], address: "大连市金普新区辽宁省大连市金普新区董家沟街道光谷南路 33 号"},
+            {name: "庄河市阳合油脂科技有限公司", lat: 39.840447, lng: 123.287442, pollutants: ["大气", "水体"], address: "大连市庄河市鞍子山乡鞍子山村东炭堆屯"},
+            {name: "大连恒鑫瑞机械有限公司", lat: 38.805346, lng: 121.143026, pollutants: ["大气"], address: "大连市旅顺口区双岛湾路468号"},
+            {name: "大连弘润全谷物食品有限公司", lat: 39.097474, lng: 121.912291, pollutants: ["大气", "水体"], address: "大连市金普新区辽宁省大连市金普新区董家沟街道光谷南路 33 号"},
+            {name: "大连通垠电缆制造有限公司", lat: 38.799958, lng: 121.157242, pollutants: ["大气", "噪声"], address: "大连市旅顺口区开发区金荣街128-2号"},
+            {name: "大连中旭玻璃钢制品有限公司", lat: 39.471518, lng: 121.744624, pollutants: ["大气", "噪声"], address: "大连市金普新区炮台街道联谊街168号"},
+            {name: "大连鑫缘物资再生利用有限公司", lat: 39.594774, lng: 121.926302, pollutants: ["大气", "水体", "土壤"], address: "大连市瓦房店市岗店办事处长青街5A号"},
+            {name: "高新区大郁宠物医院中心", lat: 38.877524, lng: 121.505575, pollutants: ["水体", "噪声"], address: "大连市高新园区凌水路424号"},
+            {name: "大连金德瑞球铁保持架有限公司", lat: 39.424195, lng: 121.960091, pollutants: ["大气", "噪声"], address: "大连市普兰店市铁西街道农场社区"},
+            {name: "博林（大连）建筑材料有限公司", lat: 39.565224, lng: 121.389369, pollutants: ["大气", "噪声"], address: "大连市长兴岛大连长兴岛经济技术开发区长兴岛街道,黄山路南侧"},
+            {name: "大连东泰产业废弃物处理有限公司", lat: 38.971382, lng: 121.848897, pollutants: ["大气", "水体", "土壤"], address: "大连市金普新区大连经济技术开发区孤山北路21号"},
+            {name: "大连瑞派宠诺宠物医院有限公司", lat: 38.959677, lng: 121.584836, pollutants: ["水体"], address: "大连市甘井子区西南路987-4号"},
+            {name: "大连道依茨大柴发动机有限公司", lat: 39.031553, lng: 121.588708, pollutants: ["大气", "土壤"], address: "大连市甘井子区姚北路212号"},
+            {name: "大连金星新材料科技有限公司", lat: 39.548146, lng: 122.653452, pollutants: ["大气", "噪声"], address: "大连市庄河市花园口经济区玫瑰街东段15号"},
+            {name: "大连来克精化有限公司", lat: 39.418067, lng: 121.711239, pollutants: ["大气", "水体", "土壤"], address: "大连市金普新区松木岛化工园区松港街8号"},
+            {name: "大连盈驰一诺生态修复有限公司", lat: 39.648698, lng: 122.077866, pollutants: ["大气", "水体", "土壤"], address: "大连市瓦房店市元台镇何屯村何屯"},
+            {name: "大连恒通弹簧有限公司", lat: 39.092464, lng: 121.918402, pollutants: ["大气", "噪声"], address: "大连市金普新区董家沟街道光明西街17-1号"},
+            {name: "大连上源智能装备制造有限公司", lat: 39.229070, lng: 121.797014, pollutants: ["大气", "噪声"], address: "大连市金普新区三十里堡镇宝石山分场"},
+            {name: "大连瑞腾冲压有限公司", lat: 38.967542, lng: 121.845511, pollutants: ["大气", "噪声"], address: "大连市金普新区淮河西路19号-A"},
+            {name: "融科（大连）储能科技有限公司", lat: 39.336670, lng: 121.735774, pollutants: ["大气", "水体"], address: "大连市金普新区普湾经济区三十里堡临港工业区"},
+            {name: "大连金事达塑料集装袋有限公司", lat: 39.459663, lng: 121.917695, pollutants: ["大气", "水体"], address: "大连市普兰店市铁西街道北山社区"},
+            {name: "大连明晶智能制造有限公司", lat: 39.143908, lng: 121.984692, pollutants: ["大气", "噪声"], address: "大连市金普新区得胜街道聚业路139、139-1、139-2号"},
+            {name: "大连骏翔电力器材有限公司", lat: 39.498636, lng: 121.804531, pollutants: ["大气", "噪声"], address: "大连市金普新区炮台镇干河村"},
+            {name: "大连歌瑞恩实业有限公司", lat: 39.064118, lng: 121.729101, pollutants: ["大气"], address: "大连市金普新区站前街道银泉街1-1号"},
+            {name: "连拓汽车技术（大连）有限公司", lat: 39.050918, lng: 121.814824, pollutants: ["大气"], address: "大连市金普新区出口加工区ⅡB-13号-A"},
+            {name: "大连美屋食品有限公司", lat: 39.289586, lng: 121.808352, pollutants: ["大气", "水体"], address: "大连市金普新区三十里堡街道金州区北方豆制品厂"},
+            {name: "大连市金普新区和润水产品有限责任公司", lat: 39.290328, lng: 122.218590, pollutants: ["大气", "水体"], address: "大连市金普新区杏树屯镇勇家村"},
+            {name: "大连金泽安全环境科技有限公司", lat: 39.917052, lng: 121.907460, pollutants: ["大气", "噪声"], address: "大连市瓦房店市永安宁镇平家村"},
+            {name: "大连船用推进器有限公司", lat: 39.347097, lng: 121.740647, pollutants: ["大气", "噪声"], address: "大连市金普新区三十里堡临港工业区海金路17号"},
+            {name: "大连盈驰一诺生态修复有限公司", lat: 39.643386, lng: 122.081589, pollutants: ["大气", "水体", "土壤"], address: "大连市瓦房店市元台镇何屯村南山屯"},
+            {name: "大连天洲酒业有限公司", lat: 39.727391, lng: 121.704375, pollutants: ["大气", "水体"], address: "大连市瓦房店市复州城镇工业园区2段3号"},
+            {name: "大连长之琳科技股份有限公司", lat: 39.096144, lng: 121.891674, pollutants: ["大气", "噪声"], address: "大连市金普新区福泉北路22号"},
+            {name: "大连棒棰岛海参发展有限公司", lat: 39.154831, lng: 122.142806, pollutants: ["大气", "水体"], address: "大连市金普新区大李家街道城子村"},
+            {name: "大连兴环能源科技有限公司", lat: 39.548326, lng: 121.306851, pollutants: ["大气"], address: "大连市瓦房店市大连长兴岛经济区化工园区"},
+            {name: "大连大学", lat: 39.108219, lng: 121.815547, pollutants: ["大气", "水体", "噪声"], address: "大连市金普新区湾里街道大连大学北区新校园内"},
+            {name: "大连西太平洋石油化工有限公司", lat: 38.985294, lng: 121.841403, pollutants: ["大气", "水体", "土壤"], address: "大连市金普新区大连西太平洋石油化工有限公司厂区内"},
+            {name: "大连美佳科技有限公司", lat: 39.153264, lng: 121.711723, pollutants: ["大气", "噪声"], address: "大连市金普新区拥政街道九里村3-919号"},
+            {name: "大连欧派科技有限公司", lat: 39.057391, lng: 121.729472, pollutants: ["大气"], address: "大连市金普新区站前街道龙泉路"},
+            {name: "大连恒力混凝土有限公司", lat: 39.563761, lng: 121.324611, pollutants: ["大气", "水体", "噪声"], address: "大连市瓦房店市长兴岛街道世辉耀村"},
+            {name: "长海县广鹿岛镇塘洼村海忠民宿", lat: 39.174250, lng: 122.360592, pollutants: ["大气", "水体"], address: "大连市长海县广鹿岛镇塘洼村"},
+            {name: "大连恒基新润水务有限公司", lat: 39.415437, lng: 121.709997, pollutants: ["大气", "水体"], address: "大连市金普新区大连普湾经济区松木岛化工产业开发区"},
+            {name: "大连未来食品有限公司", lat: 39.481612, lng: 121.732491, pollutants: ["大气", "水体"], address: "大连市金普新区炮台街道炮台街道腾云街1-2号"},
+            {name: "瓦房店威远滚动体制造有限公司", lat: 39.680127, lng: 121.995855, pollutants: ["大气", "土壤", "噪声"], address: "大连市瓦房店市祝华工业园区三家村"},
+            {name: "大连瑞杰医院有限公司", lat: 38.871531, lng: 121.618347, pollutants: ["大气", "水体"], address: "大连市西岗区华泰街68号"},
+            {name: "大连美兆综合医院有限公司", lat: 38.921926, lng: 121.664646, pollutants: ["大气", "水体"], address: "大连市中山区长江东路87号"},
+            {name: "大连鑫源金属有限公司", lat: 39.074032, lng: 121.811081, pollutants: ["大气", "噪声"], address: "大连市金普新区松翠路6号"},
+            {name: "大连铭水食品有限责任公司", lat: 39.049206, lng: 121.822138, pollutants: ["大气", "水体"], address: "大连市保税区出口加工区IID-3-4地块"},
+            {name: "大连薪汇达建筑材料制造有限公司", lat: 38.927089, lng: 121.177450, pollutants: ["大气", "噪声"], address: "大连市旅顺口区三涧堡街道于家沟村"},
+            {name: "大连吉兴嘉生物科技有限公司", lat: 39.221898, lng: 121.789779, pollutants: ["大气", "水体"], address: "大连市金普新区三十里堡街道宝石村"},
+            {name: "大连高佳化工有限公司", lat: 39.421700, lng: 121.714153, pollutants: ["大气", "水体"], address: "大连市金普新区大连普湾新区松木岛化工园区沐染路1号"},
+            {name: "辽宁中址瑞报废汽车回收拆解有限公司", lat: 39.084079, lng: 121.670793, pollutants: ["大气", "水体", "噪声"], address: "大连市金普新区光明街道祥泰路7号1-2层"},
+            {name: "大连新美汇能动力装备有限公司", lat: 38.811378, lng: 121.174783, pollutants: ["大气", "噪声"], address: "大连市旅顺口区华洋东路115号"},
+            {name: "大连金鑫水产品有限公司", lat: 39.127464, lng: 122.081476, pollutants: ["大气", "水体"], address: "大连市金普新区大李家镇正明寺村"},
+            {name: "创造空间木业（大连）有限公司", lat: 39.544470, lng: 121.922486, pollutants: ["大气", "水体"], address: "大连市瓦房店市工业园区（长青街4号）"},
+            {name: "安特思（大连）科技有限公司", lat: 39.028944, lng: 121.814839, pollutants: ["大气", "噪声"], address: "大连市金普新区海青岛街道港兴大街51-13，14号"},
+            {name: "大连金宝至电子股份有限公司", lat: 39.048047, lng: 121.799317, pollutants: ["大气", "噪声"], address: "大连市保税区IA-21-2地块、IA-21-3地块"},
+            {name: "庄河市金岛渔船修造有限公司", lat: 39.761382, lng: 123.291078, pollutants: ["大气", "水体", "土壤"], address: "大连市庄河市青堆镇盛家村七屯90号"},
+            {name: "大连润琪精密制造有限公司", lat: 39.577430, lng: 121.845631, pollutants: ["大气", "噪声"], address: "大连市瓦房店市九龙街道办事处肖炉村"},
+            {name: "大连德盛木业有限公司", lat: 39.657922, lng: 122.943647, pollutants: ["大气", "水体"], address: "大连市庄河市昌盛街道高屯委庄打路276-5号1层"},
+            {name: "大连凯威特斯半导体科技有限公司", lat: 39.081651, lng: 121.859879, pollutants: ["大气", "噪声"], address: "大连市金普新区铁山东路129号"},
+            {name: "大连谷歌卫生用品有限公司", lat: 39.076422, lng: 121.707198, pollutants: ["大气", "水体"], address: "大连市金普新区辽宁省大连市金州区站前街道金湾路249-2号1-2层"},
+            {name: "大连百城轴承有限公司", lat: 39.579203, lng: 121.984011, pollutants: ["大气", "噪声"], address: "大连市瓦房店市岗店办事处南共济街三段210-1号"},
+            {name: "大连雨林矿产有限责任公司", lat: 40.039625, lng: 122.049478, pollutants: ["大气", "水体"], address: "大连市瓦房店市许屯镇靴子沟村"},
+            {name: "大连核锐科技有限公司", lat: 39.345396, lng: 121.744288, pollutants: ["大气", "噪声"], address: "大连市金普新区三十里堡临港工业区"},
+            {name: "大连九信作物科学有限公司", lat: 39.408775, lng: 121.727742, pollutants: ["大气", "水体"], address: "大连市金普新区松木岛化工园区沐嘉路8号"},
+            {name: "大连百宜禾新能源有限公司", lat: 39.732468, lng: 122.792145, pollutants: ["大气", "水体", "噪声"], address: "大连市庄河市光明山镇乔屯村"},
+            {name: "大连隆兴鱼粉加工有限公司", lat: 39.795586, lng: 123.411061, pollutants: ["大气", "水体"], address: "大连市庄河市协成村"},
+            {name: "大连中晟元生物质科技有限公司", lat: 40.024501, lng: 122.082667, pollutants: ["大气", "水体"], address: "大连市瓦房店市许屯镇靴子沟村、山咀村"},
+            {name: "佳能医疗器械（大连）有限公司", lat: 39.063003, lng: 121.763551, pollutants: ["大气", "土壤"], address: "大连市金普新区淮河西路23号"},
+            {name: "大连普康宁精神病医院有限公司", lat: 38.975978, lng: 121.637186, pollutants: ["大气"], address: "大连市甘井子区甘北路11号"},
+            {name: "大连明正喷胶棉有限公司", lat: 39.426591, lng: 121.781568, pollutants: ["大气", "土壤"], address: "大连市金普新区炮台街道申炉村申炉屯333号"},
+            {name: "领君科技（大连）有限公司", lat: 39.227678, lng: 121.948628, pollutants: ["大气", "噪声"], address: "大连市金普新区亮甲店镇亮甲村"},
+            {name: "大连鸿金机械制造有限责任公司", lat: 39.774822, lng: 121.918234, pollutants: ["大气", "噪声"], address: "大连市瓦房店市太阳办事处王店村"},
+            {name: "大连澳薪木业有限公司", lat: 38.946031, lng: 121.314961, pollutants: ["大气", "水体"], address: "大连市旅顺口区长城街道黄家村"},
+            {name: "大连金普新区高城山医院有限公司", lat: 39.060806, lng: 121.826927, pollutants: ["大气"], address: "大连市开发区辽宁省大连经济技术开发区高志里39栋-12号"},
+            {name: "微能汇通（大连）电力技术有限公司", lat: 39.675501, lng: 121.914934, pollutants: ["大气"], address: "大连市瓦房店市太阳街道办事处楼房村（太阳工业园区）"},
+            {name: "大连义道诚金属制品有限公司", lat: 39.156124, lng: 121.923814, pollutants: ["大气", "噪声"], address: "大连市金普新区亮甲店街道亮甲店镇永锋村"},
+            {name: "大连市中山区城市更新事务中心", lat: 38.908286, lng: 121.703472, pollutants: ["大气"], address: "大连市中山区华乐街南侧，海韵华府小区东侧，海之韵公园北侧"},
+            {name: "大连力佳化学制品有限公司", lat: 38.971508, lng: 121.845356, pollutants: ["大气", "土壤"], address: "大连市金普新区晓山街10 号"},
+            {name: "大连诚华隆机械设备有限公司", lat: 38.900421, lng: 121.155019, pollutants: ["大气", "噪声"], address: "大连市旅顺口区双岛湾街道台山西村"},
+            {name: "大连鹏伸精密铸件制造有限公司", lat: 39.344935, lng: 122.000035, pollutants: ["大气", "噪声"], address: "大连市普兰店市太平街道唐房社区西北屯104号"},
+            {name: "辽宁东方风力发电有限公司", lat: 39.739136, lng: 121.480753, pollutants: ["大气", "噪声"], address: "大连市瓦房店市红沿河镇黄泥洞村"},
+            {name: "晖致制药（大连）有限公司", lat: 39.059811, lng: 121.764272, pollutants: ["大气", "水体"], address: "大连市金普新区淮河西路22号"},
+            {name: "大连金州金吉特钢制品厂", lat: 39.254289, lng: 121.796281, pollutants: ["大气", "噪声"], address: "大连市金普新区三十里堡街道红果村安乐屯"},
+            {name: "大连博尔化工有限公司", lat: 39.403339, lng: 121.720812, pollutants: ["大气", "水体", "土壤"], address: "大连市金普新区松木岛化工产业开发区沐嘉路5-1号"},
+            {name: "庄河市黑岛镇岩硕农产品加工厂", lat: 39.673648, lng: 123.154825, pollutants: ["大气", "水体"], address: "大连市庄河市黑岛镇黄贵城村孙屯"},
+            {name: "大连德宇机械有限公司", lat: 39.764028, lng: 123.063480, pollutants: ["大气", "噪声"], address: "大连市庄河市吴炉镇吴炉村"},
+            {name: "大连德泰小窑湾污水处理有限公司金普新区生态环保分公司", lat: 39.189593, lng: 121.737481, pollutants: ["大气", "水体"], address: "大连市金普新区大魏家街道连丰村炉渣综合利用厂区内"},
+            {name: "顺盛（大连）汽车部件有限公司", lat: 39.034746, lng: 121.827394, pollutants: ["大气"], address: "大连市金普新区保税区拥港路2-1号"},
+            {name: "大连易丰升金属有限公司", lat: 38.997216, lng: 121.526964, pollutants: ["大气"], address: "大连市甘井子区甘井子区革镇堡镇中革村"},
+            {name: "大连寺大汽车配件有限公司", lat: 39.080735, lng: 121.858893, pollutants: ["大气"], address: "大连市金普新区铁山东路129-4号1-2层"},
+            {name: "中科（大连）医疗设备有限公司", lat: 39.141542, lng: 121.989553, pollutants: ["大气", "水体"], address: "大连市金普新区先进装备制造业园区联东路17-14-2号"},
+            {name: "大连鑫宏报废汽车回收拆解有限公司", lat: 38.913095, lng: 121.198661, pollutants: ["大气", "水体", "噪声"], address: "大连市旅顺口区创业街15号"},
+            {name: "大连旅泰投资有限公司", lat: 38.874167, lng: 121.118381, pollutants: ["大气"], address: "大连市旅顺口区江西街道董家村"},
+            {name: "恒力发动机（大连）有限公司", lat: 39.518619, lng: 121.314222, pollutants: ["大气", "噪声"], address: "大连市长兴岛葫芦山湾北岸的长兴岛船舶和海洋工程产业园区内"},
+            {name: "大连亚明汽车部件股份有限公司", lat: 38.819273, lng: 121.172312, pollutants: ["大气", "噪声"], address: "大连市旅顺口区开发区华洋路17号"},
+            {name: "大连汉方药业有限公司", lat: 38.983886, lng: 121.358798, pollutants: ["大气", "水体", "土壤"], address: "大连市甘井子区营城子工业园区西园"},
+            {name: "大连叁颗牙智造科技有限公司", lat: 39.056578, lng: 121.783042, pollutants: ["大气"], address: "大连市开发区东北三街29号-C三号楼二楼"},
+            {name: "大连平丰汽车零部件有限公司", lat: 39.033385, lng: 121.827372, pollutants: ["大气", "噪声"], address: "大连市金普新区保税区拥港路2-2号"},
+            {name: "大连盛冶科技有限公司", lat: 39.242328, lng: 121.969518, pollutants: ["大气", "噪声"], address: "大连市金普新区华家镇胜利村小于屯"},
+            {name: "大连荣峰达塑胶科技有限公司", lat: 39.206195, lng: 121.936983, pollutants: ["大气"], address: "大连市金普新区辽宁省大连市金州区亮甲店街道亮甲村"},
+            {name: "大连环友屏蔽电泵有限公司", lat: 38.866214, lng: 121.233522, pollutants: ["大气", "噪声"], address: "大连市旅顺口区水师营街道水师营村"},
+            {name: "大连仓敷橡胶零部件有限公司", lat: 38.931304, lng: 121.292254, pollutants: ["大气", "水体", "土壤"], address: "大连市旅顺口区旅顺北路（三涧段）16号"},
+            {name: "大连宝原核设备股份有限公司", lat: 38.993130, lng: 121.656036, pollutants: ["大气", "噪声"], address: "大连市甘井子区海北路2A"},
+            {name: "优美汇科技发展(大连)有限公司", lat: 39.066093, lng: 121.724651, pollutants: ["大气"], address: "大连市金普新区站前街道金泉路332号"},
+            {name: "大连金程德生物科技有限公司", lat: 39.203211, lng: 121.608372, pollutants: ["大气", "水体"], address: "大连市金普新区大魏家街道王家村"},
+            {name: "常茂（大连）新材料有限公司", lat: 39.555278, lng: 121.306519, pollutants: ["大气"], address: "大连市长兴岛长兴岛经济区塔山街8号"},
+            {name: "大连好好宠医宠物医院有限公司", lat: 38.917846, lng: 121.591951, pollutants: ["大气", "水体"], address: "大连市沙河口区联合路27号"},
+            {name: "大连科兴矿山机械制造有限公司", lat: 39.674129, lng: 122.951343, pollutants: ["大气", "土壤", "噪声"], address: "连市庄河市新华街道小寺委疏港路299号"},
+            {name: "大连海阔饲料有限公司", lat: 39.671619, lng: 123.126628, pollutants: ["大气", "水体"], address: "大连市庄河市黑岛镇大于屯村于南屯92-1号"},
+            {name: "大连顺发建筑防水技术有限公司", lat: 39.068309, lng: 122.996951, pollutants: ["大气"], address: "大连市庄河市兴达街道干沟村"},
+            {name: "旅顺胜利机械厂", lat: 38.924320, lng: 121.319884, pollutants: ["大气", "噪声"], address: "大连市旅顺口区晨曦路448号"},
+            {name: "大连华通机车车辆修造有限公司", lat: 39.135667, lng: 121.724632, pollutants: ["大气", "噪声"], address: "大连市金普新区金州区拥政街道永安大街777号"},
+            {name: "大连三峰港口机械设备有限公司", lat: 39.541609, lng: 121.374384, pollutants: ["大气", "土壤", "噪声"], address: "大连市长兴岛长兴岛经济区吴桥路20号"},
+            {name: "大连红力兴晟食品有限公司", lat: 39.538661, lng: 121.984115, pollutants: ["大气", "水体"], address: "大连市瓦房店市岗店办事处拉山村"},
+            {name: "上实环境水务（大连）有限公司", lat: 39.316371, lng: 121.740000, pollutants: ["大气", "水体"], address: "大连市金普新区三十里堡临港工业区"},
+            {name: "大连新飞船机有限公司", lat: 38.923745, lng: 121.283286, pollutants: ["大气", "噪声"], address: "大连市旅顺口区三涧堡街道许家窑村"},
+            {name: "科兴（大连）疫苗技术有限公司", lat: 39.058931, lng: 121.864076, pollutants: ["大气", "水体"], address: "大连市金普新区生命二路36号"},
+            {name: "大连承远压力部件有限公司", lat: 38.808837, lng: 121.171523, pollutants: ["大气", "土壤", "噪声"], address: "大连市旅顺口区辽宁省大连市旅顺口区铁山街道大刘家村"},
+            {name: "大连市志德高级中学有限公司", lat: 39.331625, lng: 121.845736, pollutants: ["大气", "噪声"], address: "大连市金普新区石河街道兴河路97号"},
+            {name: "大连美嘉印刷有限公司", lat: 39.097474, lng: 121.912291, pollutants: ["大气"], address: "大连市金普新区辽宁省大连经济技术开发区铁山东路 106 号-1 号"},
+            {name: "大连嘉盛达新能源有限公司", lat: 39.420067, lng: 122.002253, pollutants: ["大气"], address: "大连市普兰店市丰荣街道普东社区车屯460号"},
+            {name: "大连国际商贸大厦有限公司瑞诗酒店", lat: 38.914770, lng: 121.630368, pollutants: ["大气"], address: "大连市中山区五惠路21号"},
+            {name: "大连滨城活塞制造有限公司", lat: 39.080598, lng: 121.709606, pollutants: ["大气", "噪声"], address: "大连市金普新区站前街道砬河路6号"},
+            {name: "大连融科储能集团股份有限公司", lat: 39.556156, lng: 122.628356, pollutants: ["大气"], address: "大连市花园口区迎春街20-10号"},
+            {name: "大连龙元堂药业有限公司", lat: 38.865246, lng: 121.519403, pollutants: ["大气", "水体", "土壤"], address: "大连市高新园区七贤岭敬贤街23号"},
+            {name: "大连泰阳水产食品有限公司", lat: 39.611956, lng: 122.737499, pollutants: ["大气", "水体"], address: "大连市庄河市大郑镇高阳村郭店屯"},
+            {name: "晖致制药（大连）有限公司", lat: 39.059811, lng: 121.764272, pollutants: ["大气", "水体", "土壤"], address: "大连市金普新区淮河西路22号"},
+            {name: "慈铭奥亚医院（大连）有限公司", lat: 38.876929, lng: 121.604976, pollutants: ["大气", "水体"], address: "大连市沙河口区滨海西路599、599-1号-1层～6层"},
+            {name: "大连福雷克斯空调配件有限公司", lat: 39.028043, lng: 121.813777, pollutants: ["大气", "噪声"], address: "大连市金普新区海青岛街道港兴大街光伸骏龙临港工业园"},
+            {name: "大连昕迪实验室科技有限公司", lat: 38.858526, lng: 121.506581, pollutants: ["大气", "水体"], address: "大连市高新园区信达街57号5号楼"},
+            {name: "大连晟态合环境科技有限公司", lat: 39.405250, lng: 122.098028, pollutants: ["大气"], address: "大连市普兰店市丰荣街道"},
+            {name: "迈艾特（大连）汽车制动部件有限公司", lat: 39.133448, lng: 121.976942, pollutants: ["大气", "土壤", "噪声"], address: "大连市金普新区联东路8-12号"},
+            {name: "大连智勇铸工有限公司", lat: 39.620453, lng: 121.933690, pollutants: ["大气", "噪声"], address: "大连市瓦房店市岗店办事处张山咀村"},
+            {name: "润新微电子（大连）有限公司", lat: 38.843844, lng: 121.427969, pollutants: ["大气"], address: "大连市高新园区黄泥川智能制造产业园4#厂房一~二层"},
+            {name: "京瓷（大连）机器有限公司", lat: 39.051793, lng: 121.783749, pollutants: ["大气"], address: "大连市金普新区黄海西六路2号"},
+            {name: "大连友谊肉联食品有限公司", lat: 39.124123, lng: 121.739389, pollutants: ["大气", "水体"], address: "大连市金普新区拥政街道红塔村小阎家楼413号"},
+            {name: "中国检验认证集团辽宁有限公司大连分公司", lat: 39.043211, lng: 121.803572, pollutants: ["大气"], address: "大连市保税区海富路8号F"},
+            {name: "大连大北农牧业科技有限责任公司", lat: 39.595758, lng: 121.923425, pollutants: ["大气"], address: "大连市瓦房店市钻石街2026号"},
+            {name: "大连天宝绿色食品股份有限公司", lat: 39.131120, lng: 121.724642, pollutants: ["大气"], address: "大连市金普新区拥政街道三里村"},
+            {name: "大连美兆综合医院有限公司", lat: 38.929937, lng: 121.664786, pollutants: ["大气", "水体"], address: "大连市中山区人民东路56号"},
+            {name: "大连奥森制药有限公司", lat: 39.562993, lng: 122.646008, pollutants: ["大气"], address: "大连市花园口区花园口经济区丁香街12-1号"},
+            {name: "奥泽新材料（大连）有限公司", lat: 39.132313, lng: 121.700312, pollutants: ["大气"], address: "大连市金普新区友谊街道龙王庙村丘（地）号32-155-3"},
+            {name: "大连鼎华医院有限公司", lat: 39.094761, lng: 121.685727, pollutants: ["大气", "水体"], address: "大连市金普新区光明街道汉正路8号（现为光中街道）"},
+            {name: "大连金水涂装工程有限公司", lat: 39.190358, lng: 121.751444, pollutants: ["大气", "土壤"], address: "大连市金普新区十三里工业区金水路7号"},
+            {name: "大连浩和食品有限公司", lat: 39.057030, lng: 121.859845, pollutants: ["大气", "水体"], address: "大连市金普新区双D港二街36号"},
+            {name: "深蓝特医（大连）生物科技有限公司", lat: 39.083576, lng: 121.908293, pollutants: ["大气", "水体"], address: "大连市金普新区大连经济技术开发区光谷南路17号-1-3层"},
+            {name: "奇瑞汽车股份有限公司大连分公司", lat: 39.051076, lng: 121.845783, pollutants: ["大气", "噪声"], address: "大连市保税区辽宁省大连保税区瑞港路6号"},
+            {name: "大连北黄海实业发展集团有限公司", lat: 39.534279, lng: 122.603415, pollutants: ["大气"], address: "大连市庄河市明阳街道永增村"},
+            {name: "大连枫叶双语学校", lat: 39.087627, lng: 122.019723, pollutants: ["大气"], address: "大连市金普新区金石滩中心大街9号-7"},
+            {name: "辽宁航恒宝林电缆集团有限公司", lat: 39.182092, lng: 122.099696, pollutants: ["大气", "噪声"], address: "大连市金普新区登沙河临港工业区河滨北路59-6号"},
+            {name: "大连龙尧塑料机械有限公司", lat: 38.933000, lng: 121.252250, pollutants: ["大气", "土壤", "噪声"], address: "大连市旅顺口区三涧堡镇石灰窑村"},
+            {name: "大连紫光凌水污水处理有限公司", lat: 38.866012, lng: 121.535305, pollutants: ["大气", "水体", "土壤"], address: "大连市高新园区凌河街41号"},
+            {name: "大连柏年盛康血液透析中心有限公司", lat: 39.063048, lng: 121.844371, pollutants: ["大气", "水体"], address: "大连市金普新区隆泰嘉园14栋1-4号"},
+            {name: "大连汉顿工业有限公司", lat: 39.543923, lng: 122.633000, pollutants: ["大气"], address: "大连市庄河市辽宁省大连花园口经济区海棠街88号"},
+            {name: "大连医嘉医疗健康产业园有限公司", lat: 39.044880, lng: 121.834886, pollutants: ["大气", "水体"], address: "大连市金普新区海青岛街道护港北一路9、9-1、9-2号"},
+            {name: "大连亚明汽车部件股份有限公司", lat: 38.819759, lng: 121.170981, pollutants: ["大气", "土壤", "噪声"], address: "大连市旅顺口区华洋路17号"},
+            {name: "大连幸福里仁爱综合医院有限责任公司", lat: 39.053043, lng: 121.773572, pollutants: ["大气"], address: "大连市开发区辽宁路西侧-42号"},
+            {name: "恒力造船（大连）有限公司", lat: 39.545534, lng: 121.394312, pollutants: ["大气", "水体", "土壤", "噪声"], address: "大连长兴岛经济区宝岛路300 号"},
+            {name: "营口兴和特耐有限公司", lat: 40.643589, lng: 122.310823, pollutants: ["大气", "水体", "土壤"], address: "营口市老边区金牛山大街205 号"},
+            {name: "营口语博水泥制品有限公司", lat: 40.649288, lng: 122.421888, pollutants: ["大气", "水体"], address: "营口市老边区老边街道办事处二村"},
+            {name: "营口市新亿达水泥构件厂", lat: 40.685174, lng: 122.314996, pollutants: ["大气", "水体"], address: "营口市老边区路南镇崔家村"},
+            {name: "营口海达新材料科技有限公司", lat: 40.645634, lng: 122.316196, pollutants: ["大气", "土壤", "噪声"], address: "营口市老边区金牛山大街东203 号"},
+            {name: "营口大正塑料科技有限公司", lat: 40.154758, lng: 122.064203, pollutants: ["大气", "水体"], address: "营口市仙人岛经济开发区"},
+            {name: "营口鑫垚能源环保科技有限公司", lat: 40.156830, lng: 122.067048, pollutants: ["大气", "噪声"], address: "营口仙人岛经济开发区"},
+            {name: "辽宁炬森能源集团有限公司", lat: 40.147495, lng: 122.056639, pollutants: ["大气"], address: "营口市仙人岛经济开发区"},
+            {name: "盖州市博隆耐火材料有限公司", lat: 40.449633, lng: 122.438438, pollutants: ["大气", "水体", "土壤"], address: "营口市盖州市青石岭镇高丽城村"},
+            {name: "辽阳市辽盘防水材料厂", lat: 41.403044, lng: 123.490664, pollutants: ["大气", "水体"], address: "辽阳市灯塔市铧子镇沈家村"},
+            {name: "灯塔市嘉玺牧业有限公司", lat: 41.513906, lng: 123.198987, pollutants: ["大气", "水体"], address: "灯塔市柳条寨镇南李大人村"},
+            {name: "辽阳冀东水泥有限公司", lat: 41.309370, lng: 123.336060, pollutants: ["大气", "噪声"], address: "辽阳市文圣区罗大台镇青峰村"},
+            {name: "辽阳东方波特蓝环保科技有限公司", lat: 41.354233, lng: 123.503918, pollutants: ["大气", "水体", "土壤"], address: "辽阳市灯塔市西大窑镇上缸窑村"},
+            {name: "灯塔市铧顺矿业有限公司", lat: 41.351420, lng: 123.504339, pollutants: ["大气", "水体", "土壤"], address: "辽阳市灯塔市西大窑镇上缸窑村"},
+            {name: "辽阳县金鑫塑料加工厂", lat: 41.183467, lng: 122.858718, pollutants: ["大气", "水体", "噪声"], address: "辽阳市辽阳县刘二堡镇三岔子村"},
+            {name: "辽阳县君伟再生资源回收站", lat: 41.221285, lng: 123.016863, pollutants: ["大气", "水体"], address: "辽阳市辽阳县兴隆镇兴隆台村"},
+            {name: "沈阳红梅食品有限公司", lat: 41.942620, lng: 123.579108, pollutants: ["大气", "水体"], address: "沈阳市沈北新区蒲南路168号"},
+            {name: "航达新科技（沈阳）有限公司", lat: 41.753510, lng: 123.216380, pollutants: ["大气", "噪声"], address: "沈阳市经济技术开发区十三号街22号M1-06"},
+            {name: "沈阳中航机电三洋制冷设备有限公司", lat: 41.774749, lng: 123.261454, pollutants: ["大气", "噪声"], address: "沈阳经济技术开发区四号街六号路6甲1号"},
+            {name: "沈阳沃华森新型装饰材料有限公司", lat: 41.824440, lng: 123.228818, pollutants: ["大气", "噪声"], address: "沈阳市于洪区大兴朝鲜族乡兴盛村"},
+            {name: "沈阳创新合金有限公司", lat: 41.793802, lng: 123.224490, pollutants: ["大气", "噪声"], address: "沈阳市于洪区于洪街道洪泊路永兴街"},
+            {name: "沈阳华美绿建高新科技材料有限公司", lat: 41.926259, lng: 123.344860, pollutants: ["大气", "噪声"], address: "沈阳市于洪区造化街道上蒲河村"},
+            {name: "沈阳亿兴电力设备有限公司", lat: 41.811844, lng: 123.223834, pollutants: ["大气", "噪声"], address: "沈阳市于洪区沙岭街道洪泽路1-7号"},
+            {name: "沈阳田源集中供热有限公司", lat: 41.951778, lng: 123.155790, pollutants: ["大气"], address: "沈阳市于洪区光辉路66号"},
+            {name: "沈阳圣禹热力有限公司", lat: 41.869240, lng: 123.287285, pollutants: ["大气"], address: "沈阳市马三家街道永安新村小区"},
+            {name: "沈阳鑫奥线缆制造有限公司", lat: 41.608472, lng: 122.850411, pollutants: ["噪声"], address: "沈阳市辽中区潘家堡镇蔡伯街村"},
+            {name: "沈阳市露佳酒厂", lat: 41.427308, lng: 122.860802, pollutants: ["大气", "水体", "噪声"], address: "沈阳市辽中区肖寨门镇妈妈街村"},
+            {name: "辽中县得达制胶有限责任公司", lat: 41.492333, lng: 122.834061, pollutants: ["大气", "水体", "土壤"], address: "沈阳市辽中区茨榆坨街道黄北村"},
+            {name: "沈阳新泷口酒业有限公司", lat: 41.886890, lng: 123.554000, pollutants: ["大气", "水体"], address: "沈阳市沈北新区通顺街27-6号"},
+            {name: "青岛海达盛冷凝器有限公司沈阳分公司", lat: 41.928599, lng: 123.561893, pollutants: ["大气", "噪声"], address: "沈阳市沈北新区辉山大街 150-6 号"},
+            {name: "沈阳沈北康健医疗有限公司康健医院", lat: 42.042814, lng: 123.526683, pollutants: ["水体"], address: "沈阳市沈北新区福州路59-6号"},
+            {name: "佛吉亚斯林达安全科技（沈阳）有限公司", lat: 41.961760, lng: 123.345663, pollutants: ["大气"], address: "沈阳市沈北新区蒲悦路24号"},
+            {name: "辽宁博澳恩普生物科技有限公司", lat: 41.895919, lng: 123.572029, pollutants: ["大气", "水体", "土壤"], address: "沈阳市沈北新区新阳路33号"},
+            {name: "沈阳炽炎科技有限公司", lat: 41.996343, lng: 123.376223, pollutants: ["大气", "噪声"], address: "沈阳市沈北新区常州西路59-7号"},
+            {name: "沈阳市新盛酿酒厂", lat: 42.067736, lng: 123.428302, pollutants: ["大气", "水体"], address: "沈阳市沈北新区兴隆台镇锡伯族镇三台子村"},
+            {name: "辽宁民威设备制造有限公司", lat: 41.951322, lng: 123.469111, pollutants: ["大气"], address: "沈阳市沈北新区蒲河路73甲-12号4门"},
+            {name: "沈阳奎斯特李食品有限公司", lat: 41.912910, lng: 123.371355, pollutants: ["大气", "水体", "噪声"], address: "沈阳市沈北新区正良四路52甲号"},
+            {name: "沈阳精合数控科技开发有限公司", lat: 41.980246, lng: 123.370786, pollutants: ["大气"], address: "沈阳市沈北新区道义北大街441号"}
+        ];
+
+        document.getElementById('total-count').innerText = rawData.length;
+
+        const companyListEl = document.getElementById('company-list');
+        const markers = [];
+
+        // 渲染函数
+        function renderList(data) {
+            companyListEl.innerHTML = '';
+            markers.forEach(m => map.removeLayer(m));
+            markers.length = 0;
+
+            if(data.length === 0) {
+                companyListEl.innerHTML = '<div class="text-center text-gray-400 text-sm py-8"><i class="fa-regular fa-folder-open mb-2 text-2xl"></i><br>未找到相关企业</div>';
+                return;
+            }
+
+            data.forEach((item) => {
+                // 创建列表项
+                const li = document.createElement('div');
+                li.className = "p-3 hover:bg-blue-50 rounded-lg cursor-pointer transition-all border border-transparent hover:border-blue-100 group";
+                li.innerHTML = `
+                    <div class="font-medium text-gray-700 group-hover:text-blue-700 text-sm truncate">${item.name}</div>
+                    <div class="flex gap-1 mt-2 flex-wrap">
+                        ${item.pollutants.map(p => `<span class="pollutant-tag tag-${p}">${p}</span>`).join('')}
                     </div>
-                    <div style="margin-bottom: 5px; color: #666;">
-                        <i class="fas fa-map-marker-alt"></i> ${enterprise.location}
-                    </div>
-                    <div style="margin-top: 10px;">
-                        <div style="font-weight: bold; margin-bottom: 5px; color: #4fc3f7;">
-                            <i class="fas fa-biohazard"></i> 主要污染物
-                        </div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-                            ${enterprise.pollutants.map(p => 
-                                `<span style="background: #4fc3f7; 
-                                    color: white; 
-                                    padding: 3px 8px; 
-                                    border-radius: 12px; 
-                                    font-size: 12px;">
-                                    ${p}
-                                </span>`
-                            ).join('')}
-                        </div>
-                    </div>
-                `);
+                `;
                 
-                marker.on('click', function() {
-                    showEnterpriseInfo(enterprise);
-                    highlightEnterprise(enterprise.id);
+                li.addEventListener('click', () => {
+                    map.flyTo([item.lat, item.lng], 14, { duration: 1.5 });
+                    marker.openPopup();
                 });
+
+                companyListEl.appendChild(li);
+
+                // 创建地图标记
+                const marker = L.marker([item.lat, item.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: "<div style='background-color:#3b82f6; width:12px; height:12px; border-radius:50%; border:2px solid white; box-shadow:0 0 0 2px #3b82f6;'></div>",
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    })
+                }).addTo(map);
                 
-                marker.enterpriseId = enterprise.id;
+                const popupContent = `
+                    <div class="p-1">
+                        <h3 class="font-bold text-gray-800 mb-2 text-sm border-b pb-2">${item.name}</h3>
+                        ${item.address ? `<p class="text-xs text-gray-500 mb-3 flex items-start"><i class="fa-solid fa-location-dot mt-0.5 mr-1.5 text-blue-500"></i>${item.address}</p>` : ''}
+                        <div>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">监测因子</p>
+                            <div class="flex flex-wrap gap-1">
+                                ${item.pollutants.map(p => `<span class="pollutant-tag tag-${p}">${p}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                marker.bindPopup(popupContent, { className: 'custom-popup', maxWidth: 300 });
                 markers.push(marker);
             });
         }
 
-        // 显示企业信息
-        function showEnterpriseInfo(enterprise) {
-            const infoDiv = document.getElementById('locationInfo');
-            
-            // 创建污染物标签
-            let pollutantTags = "";
-            enterprise.pollutants.forEach(pollutant => {
-                let tagClass = "pollutant-tag ";
-                if (pollutant === "废气") tagClass += "tag-air";
-                if (pollutant === "废水") tagClass += "tag-water";
-                if (pollutant === "土壤") tagClass += "tag-soil";
-                if (pollutant === "噪声") tagClass += "tag-noise";
-                
-                pollutantTags += `<div class="${tagClass}">${pollutant}</div>`;
-            });
-            
-            // 创建信息HTML
-            infoDiv.innerHTML = `
-                <h3>${enterprise.name}</h3>
-                <p class="enterprise-location"><i class="fas fa-map-marker-alt"></i> ${enterprise.location}</p>
-                
-                <div style="margin-top: 15px;">
-                    <h4 style="color: #4fc3f7; margin-bottom: 10px; border-bottom: 1px solid rgba(79, 195, 247, 0.4); padding-bottom: 5px;">
-                        <i class="fas fa-biohazard"></i> 主要污染物类型
-                    </h4>
-                    <div class="pollutants-tags">
-                        ${pollutantTags}
-                    </div>
-                </div>
-            `;
-        }
-
-        // 在列表中高亮显示选中的企业
-        function highlightEnterprise(enterpriseId) {
-            // 移除所有active类
-            document.querySelectorAll('.enterprise-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            
-            // 为当前选中的项添加active类
-            const selectedItem = document.querySelector(`.enterprise-item[data-id="${enterpriseId}"]`);
-            if (selectedItem) {
-                selectedItem.classList.add('active');
-                selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        }
-
-        // 初始化企业列表
-        function initEnterpriseList(enterprises) {
-            const listContainer = document.getElementById('enterpriseList');
-            listContainer.innerHTML = '';
-            
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const endIndex = startIndex + itemsPerPage;
-            const paginatedEnterprises = enterprises.slice(startIndex, endIndex);
-            
-            paginatedEnterprises.forEach(enterprise => {
-                // 创建污染物标签
-                let pollutantTags = "";
-                enterprise.pollutants.forEach(pollutant => {
-                    let tagClass = "pollutant-tag ";
-                    if (pollutant === "废气") tagClass += "tag-air";
-                    if (pollutant === "废水") tagClass += "tag-water";
-                    if (pollutant === "土壤") tagClass += "tag-soil";
-                    if (pollutant === "噪声") tagClass += "tag-noise";
-                    
-                    pollutantTags += `<div class="${tagClass}">${pollutant}</div>`;
-                });
-                
-                const item = document.createElement('div');
-                item.className = 'enterprise-item';
-                item.dataset.id = enterprise.id;
-                item.innerHTML = `
-                    <div class="enterprise-header">
-                        <div class="enterprise-name">${enterprise.name}</div>
-                    </div>
-                    <div class="pollutants-tags">
-                        ${pollutantTags}
-                    </div>
-                    <div class="enterprise-location"><i class="fas fa-map-marker-alt"></i> ${enterprise.location}</div>
-                `;
-                
-                // 添加点击事件
-                item.addEventListener('click', () => {
-                    showEnterpriseInfo(enterprise);
-                    highlightEnterprise(enterprise.id);
-                });
-                
-                listContainer.appendChild(item);
-            });
-            
-            // 生成分页按钮
-            generatePagination(enterprises.length);
-        }
-        
-        // 生成分页按钮
-        function generatePagination(totalItems) {
-            const paginationContainer = document.getElementById('pagination');
-            paginationContainer.innerHTML = '';
-            
-            const totalPages = Math.ceil(totalItems / itemsPerPage);
-            
-            // 上一页按钮
-            const prevBtn = document.createElement('button');
-            prevBtn.className = 'pagination-btn';
-            prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
-            prevBtn.disabled = currentPage === 1;
-            prevBtn.addEventListener('click', () => {
-                if (currentPage > 1) {
-                    currentPage--;
-                    initEnterpriseList(currentEnterprises);
-                }
-            });
-            paginationContainer.appendChild(prevBtn);
-            
-            // 页码按钮
-            for (let i = 1; i <= totalPages; i++) {
-                const pageBtn = document.createElement('button');
-                pageBtn.className = `pagination-btn ${i === currentPage ? 'active' : ''}`;
-                pageBtn.textContent = i;
-                pageBtn.addEventListener('click', () => {
-                    currentPage = i;
-                    initEnterpriseList(currentEnterprises);
-                });
-                paginationContainer.appendChild(pageBtn);
-            }
-            
-            // 下一页按钮
-            const nextBtn = document.createElement('button');
-            nextBtn.className = 'pagination-btn';
-            nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
-            nextBtn.disabled = currentPage === totalPages;
-            nextBtn.addEventListener('click', () => {
-                if (currentPage < totalPages) {
-                    currentPage++;
-                    initEnterpriseList(currentEnterprises);
-                }
-            });
-            paginationContainer.appendChild(nextBtn);
-        }
+        renderList(rawData);
 
         // 搜索功能
-        function setupSearch() {
-            const searchInput = document.getElementById('searchInput');
-            const searchBtn = document.getElementById('searchBtn');
-            
-            searchBtn.addEventListener('click', performSearch);
-            searchInput.addEventListener('keyup', (e) => {
-                if (e.key === 'Enter') performSearch();
-            });
-            
-            function performSearch() {
-                const searchTerm = searchInput.value.toLowerCase().trim();
-                if (!searchTerm) {
-                    applyFilter();
-                    return;
-                }
-                
-                // 查找匹配的企业
-                const foundEnterprises = enterprises.filter(ent => 
-                    ent.name.toLowerCase().includes(searchTerm)
-                );
-                
-                if (foundEnterprises.length > 0) {
-                    currentPage = 1;
-                    currentEnterprises = foundEnterprises;
-                    initEnterpriseList(foundEnterprises);
-                    addMarkersToMap(map, foundEnterprises);
-                    
-                    if (foundEnterprises.length > 0) {
-                        showEnterpriseInfo(foundEnterprises[0]);
-                        highlightEnterprise(foundEnterprises[0].id);
-                    }
-                } else {
-                    alert('未找到匹配的企业，请尝试其他关键词');
-                }
-            }
-        }
-
-        // 设置筛选功能
-        function setupFilter() {
-            const filterOptions = document.querySelectorAll('.filter-btn');
-            
-            filterOptions.forEach(option => {
-                option.addEventListener('click', function() {
-                    // 移除所有active类
-                    filterOptions.forEach(opt => opt.classList.remove('active'));
-                    
-                    // 为当前选中的项添加active类
-                    this.classList.add('active');
-                    currentFilter = this.textContent;
-                    
-                    // 应用筛选
-                    applyFilter();
-                });
-            });
-        }
-        
-        // 应用筛选
-        function applyFilter() {
-            let filteredEnterprises = enterprises;
-            
-            if (currentFilter !== "全部企业") {
-                const filterText = currentFilter.replace("排放", "").replace("污染", "");
-                filteredEnterprises = enterprises.filter(ent => 
-                    ent.pollutants.includes(filterText)
-                );
-            }
-            
-            currentPage = 1;
-            currentEnterprises = filteredEnterprises;
-            initEnterpriseList(filteredEnterprises);
-            addMarkersToMap(map, filteredEnterprises);
-            
-            // 默认显示第一个企业信息
-            if (filteredEnterprises.length > 0) {
-                showEnterpriseInfo(filteredEnterprises[0]);
-                highlightEnterprise(filteredEnterprises[0].id);
-            }
-        }
-
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            // 初始化地图
-            map = initMap();
-            
-            // 加载所有企业数据
-            currentEnterprises = enterprises;
-            initEnterpriseList(enterprises);
-            addMarkersToMap(map, enterprises);
-            
-            // 默认显示第一个企业信息
-            if (enterprises.length > 0) {
-                showEnterpriseInfo(enterprises[0]);
-                highlightEnterprise(enterprises[0].id);
-            }
-            
-            // 设置搜索功能
-            setupSearch();
-            
-            // 设置筛选功能
-            setupFilter();
-            
-            // 隐藏加载屏幕
-            setTimeout(() => {
-                document.getElementById('loadingScreen').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('loadingScreen').style.display = 'none';
-                }, 500);
-            }, 800);
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = rawData.filter(item => item.name.toLowerCase().includes(term));
+            renderList(filtered);
         });
+
+        // 移动端微信弹窗逻辑
+        document.getElementById('mobile-wechat-btn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('mobile-qrcode-popup').classList.remove('hidden');
+        });
+
+        // 点击背景关闭弹窗
+        document.getElementById('mobile-qrcode-popup').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
+            }
+        });
+
     </script>
+    <style>
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .animate-slide-up {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    </style>
 </body>
 </html>
